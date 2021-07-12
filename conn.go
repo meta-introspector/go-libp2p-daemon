@@ -2,6 +2,7 @@ package p2pd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -66,6 +67,7 @@ func (d *Daemon) handleConn(c net.Conn) {
 			}
 
 			if s != nil {
+				// TODO: io.PipeWriters?
 				d.doStreamPipe(c, s)
 				return
 			}
@@ -143,6 +145,24 @@ func (d *Daemon) handleConn(c net.Conn) {
 
 			if sub != nil {
 				d.doPubsubPipe(sub, r, w)
+				return
+			}
+
+		case pb.Request_PERSISTENT_CONN_UPGRADE:
+			d.handleUpgradedConn(r, w)
+			fmt.Println("about to close the stream :(")
+			return
+
+		case pb.Request_ADD_UNARY_HANDLER:
+			fallthrough
+		case pb.Request_SEND_RESPONSE_TO_REMOTE:
+			fallthrough
+		case pb.Request_CALL_UNARY:
+			if err := w.WriteMsg(
+				// TODO: return better error message
+				errorResponseString("Can't satisfy request through non-persistent stream"),
+			); err != nil {
+				log.Debugw("error writing response", "error", err)
 				return
 			}
 
@@ -319,6 +339,10 @@ func errorResponseString(err string) *pb.Response {
 		Type:  pb.Response_ERROR.Enum(),
 		Error: &pb.ErrorResponse{Msg: &err},
 	}
+}
+
+func malformedRequestErrorResponse() *pb.Response {
+	return errorResponseString("Malformed request; missing parameters")
 }
 
 func makeStreamInfo(s network.Stream) *pb.StreamInfo {
