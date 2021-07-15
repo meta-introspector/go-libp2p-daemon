@@ -33,7 +33,7 @@ func TestUnaryCalls(t *testing.T) {
 
 	response, err := p2.UnaryCall(
 		peer1ID,
-		[]protocol.ID{protocol.ID(protoName)},
+		protocol.ID(protoName),
 		[]byte("brothas be like: you, george, ain't tha funking kinda hard on you?"),
 	)
 	if err != nil {

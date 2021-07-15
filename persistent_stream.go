@@ -3,16 +3,20 @@ package p2pd
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/gogo/protobuf/proto"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pb "github.com/libp2p/go-libp2p-daemon/pb"
 )
 
-func (d *Daemon) handleUpgradedConn(r ggio.Reader, w ggio.Writer) {
+func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
+	w := &safeWriter{w: unsafeW}
+
 	for {
 		var req pb.Request
 		if err := r.ReadMsg(&req); err != nil && err != io.EOF {
@@ -51,11 +55,11 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 		return malformedRequestErrorResponse()
 	}
 
+	callID := *req.CallUnary.CallId
+
 	pid, err := peer.IDFromBytes(req.CallUnary.Peer)
 	if err != nil {
-		return errorResponseString(
-			fmt.Sprintf("Failed to parse peer id: %v", err),
-		)
+		return errorUnaryCall(callID, err)
 	}
 
 	ctx, cancel := d.requestContext(req.CallUnary.GetTimeout())
@@ -64,28 +68,27 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 	remoteStream, err := d.host.NewStream(
 		ctx,
 		pid,
-		protocol.ConvertFromStrings(req.CallUnary.Protos)...,
+		protocol.ID(*req.CallUnary.Proto),
 	)
 	if err != nil {
-		return errorResponse(err)
+		return errorUnaryCall(callID, err)
 	}
 	defer remoteStream.Close()
 
-	// write proto message to remote
 	if err := ggio.NewDelimitedWriter(remoteStream).WriteMsg(req); err != nil {
-		return errorResponse(err)
+		return errorUnaryCall(callID, err)
 	}
 
 	remoteResp := &pb.Request{}
 	if err := ggio.NewDelimitedReader(remoteStream, network.MessageSizeMax).ReadMsg(remoteResp); err != nil {
-		return errorResponse(err)
+		return errorUnaryCall(callID, err)
 	}
 
 	resp := okResponse()
-	// TODO: add erorrs
 	resp.CallUnaryResponse = &pb.CallUnaryResponse{
 		CallId: remoteResp.SendResponseToRemote.CallId,
 		Result: remoteResp.SendResponseToRemote.Data,
+		Error:  remoteResp.SendResponseToRemote.Error,
 	}
 
 	return resp
@@ -126,7 +129,7 @@ func (d *Daemon) getPersistentStreamHandler(clientWriter ggio.Writer) network.St
 		resp.RequestHandling = &pb.RequestHandling{
 			CallId: req.CallUnary.CallId,
 			Data:   req.CallUnary.Data,
-			Protos: req.CallUnary.Protos,
+			Proto:  req.CallUnary.Proto,
 		}
 
 		if err := clientWriter.WriteMsg(resp); err != nil {
@@ -165,4 +168,15 @@ func (d *Daemon) doSendReponseToRemote(req *pb.Request) *pb.Response {
 	responseChan <- req
 
 	return okResponse()
+}
+
+type safeWriter struct {
+	w ggio.Writer
+	m sync.Mutex
+}
+
+func (sw *safeWriter) WriteMsg(msg proto.Message) error {
+	sw.m.Lock()
+	defer sw.m.Unlock()
+	return sw.w.WriteMsg(msg)
 }

@@ -93,15 +93,19 @@ func detachHandler(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
 		}
 
 		go func() {
+			callID := *req.RequestHandling.CallId
 			result, err := handler(req.RequestHandling.Data)
+			if err != nil {
+				c.WriteRequest(errorUnaryCallResponse(callID, err))
+				return
+			}
+
 			c.WriteRequest(
 				&pb.Request{
 					Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 					SendResponseToRemote: &pb.SendResponseToRemote{
 						CallId: req.RequestHandling.CallId,
 						Data:   result,
-						// TODO: fix this
-						Error: []byte(fmt.Sprintf("%v", err)),
 					},
 				},
 			)
@@ -109,7 +113,7 @@ func detachHandler(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
 	}
 }
 
-func (c *Client) UnaryCall(p peer.ID, protos []protocol.ID, data []byte) ([]byte, error) {
+func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, error) {
 	control, err := c.getPersistentConn()
 	if err != nil {
 		return nil, err
@@ -122,7 +126,7 @@ func (c *Client) UnaryCall(p peer.ID, protos []protocol.ID, data []byte) ([]byte
 		Type: pb.Request_CALL_UNARY.Enum(),
 		CallUnary: &pb.CallUnaryRequest{
 			Peer:   []byte(p),
-			Protos: protocol.ConvertToStrings(protos),
+			Proto:  (*string)(&proto),
 			Data:   data,
 			CallId: &callID,
 			// TODO: client option
@@ -138,6 +142,33 @@ func (c *Client) UnaryCall(p peer.ID, protos []protocol.ID, data []byte) ([]byte
 		return nil, err
 	}
 
-	// TODO: handle errors
+	if resp.CallUnaryResponse.Error != nil {
+		return nil, NewRemoteError(*resp.CallUnaryResponse.Error)
+	}
+
 	return resp.CallUnaryResponse.Result, nil
+}
+
+func NewRemoteError(message string) *RemoteError {
+	return &RemoteError{message}
+}
+
+// RemoteError is returned when remote peer failed to handle a request
+type RemoteError struct {
+	msg string
+}
+
+func (re *RemoteError) Error() string {
+	return fmt.Sprintf("remote peer failed to handle request: %s", re.msg)
+}
+
+func errorUnaryCallResponse(callID int64, err error) *pb.Request {
+	errMsg := err.Error()
+	return &pb.Request{
+		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+		SendResponseToRemote: &pb.SendResponseToRemote{
+			CallId: &callID,
+			Error:  &errMsg,
+		},
+	}
 }

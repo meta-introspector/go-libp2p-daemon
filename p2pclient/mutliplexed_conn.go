@@ -22,9 +22,7 @@ type multiplexedConn struct {
 	writer ggio.Writer
 	reader ggio.Reader
 
-	// proto.ID -> chan *pb.Response
 	handleTasks sync.Map
-	// callID -> chan *pb.Response
 	callResults sync.Map
 }
 
@@ -50,33 +48,9 @@ func (mc *multiplexedConn) listen() {
 		log.Debugw("received message from daemon", msg)
 
 		if msg.RequestHandling != nil {
-			protoIDs := protocol.ConvertFromStrings(msg.RequestHandling.Protos)
-			for _, p := range protoIDs {
-				go func(protoID protocol.ID) {
-					hc, found := mc.handleTasks.Load(protoID)
-					if !found {
-						mc.writer.WriteMsg(
-							responseErrorProtoNotFound(
-								*msg.RequestHandling.CallId,
-								protoID,
-							),
-						)
-					}
-					handeChan := hc.(chan *pb.Response)
-					handeChan <- msg
-				}(p)
-			}
+			go mc.doHandleRequest(msg)
 		} else if msg.CallUnaryResponse != nil {
-			callID := *msg.CallUnaryResponse.CallId
-			go func() {
-				cr, found := mc.callResults.Load(callID)
-				if !found {
-					return
-				}
-
-				callResults := cr.(chan *pb.Response)
-				callResults <- msg
-			}()
+			go mc.doReturnResponse(msg)
 		}
 	}
 }
@@ -107,13 +81,38 @@ func (mc *multiplexedConn) ReadUnaryResponse(callID int64) (*pb.Response, error)
 }
 
 func responseErrorProtoNotFound(callId int64, p protocol.ID) *pb.Request {
+	errMsg := fmt.Sprintf("protocol %s not supported", p)
 	return &pb.Request{
 		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 		SendResponseToRemote: &pb.SendResponseToRemote{
 			CallId: &callId,
-			Error: []byte(
-				fmt.Sprintf("protocol %s not supported", p),
-			),
+			Error:  &errMsg,
 		},
 	}
+}
+
+func (mc *multiplexedConn) doHandleRequest(msg *pb.Response) {
+	protoID := protocol.ID(*msg.RequestHandling.Proto)
+	hc, found := mc.handleTasks.Load(protoID)
+	if !found {
+		mc.writer.WriteMsg(
+			responseErrorProtoNotFound(
+				*msg.RequestHandling.CallId,
+				protoID,
+			),
+		)
+	}
+	handeChan := hc.(chan *pb.Response)
+	handeChan <- msg
+}
+
+func (mc *multiplexedConn) doReturnResponse(msg *pb.Response) {
+	callID := *msg.CallUnaryResponse.CallId
+	cr, found := mc.callResults.Load(callID)
+	if !found {
+		return
+	}
+
+	callResults := cr.(chan *pb.Response)
+	callResults <- msg
 }

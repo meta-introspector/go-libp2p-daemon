@@ -339,6 +339,14 @@ func errorResponseString(err string) *pb.Response {
 	}
 }
 
+func errorUnaryCall(callID int64, err error) *pb.Response {
+	resp := errorResponse(err)
+	resp.CallUnaryResponse = &pb.CallUnaryResponse{
+		CallId: &callID,
+	}
+	return resp
+}
+
 func malformedRequestErrorResponse() *pb.Response {
 	return errorResponseString("Malformed request; missing parameters")
 }
