@@ -2,7 +2,6 @@ package p2pd
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"time"
@@ -150,7 +149,6 @@ func (d *Daemon) handleConn(c net.Conn) {
 
 		case pb.Request_PERSISTENT_CONN_UPGRADE:
 			d.handleUpgradedConn(r, w)
-			fmt.Println("about to close the stream :(")
 			return
 
 		case pb.Request_ADD_UNARY_HANDLER:

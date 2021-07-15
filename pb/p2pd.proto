@@ -167,23 +167,30 @@ message PSResponse {
 
 message CallUnaryRequest {
   required bytes peer = 1;
-  repeated string proto = 2;
+  repeated string protos = 2;
   required bytes data = 3;
-  optional int64 timeout = 4;
+  required int64 callId = 4;
+  optional int64 timeout = 5;
 }
 
-message CallUnaryResponse { optional bytes result = 1; }
+message CallUnaryResponse {
+  required int64 callId = 1;
+  optional bytes result = 2;
+}
 
 message AddUnaryHandlerRequest {
-  repeated string proto = 1;
+  required string proto = 1;
 }
 
 message SendResponseToRemote {
   required int64 callId = 1;
   required bytes data = 2;
+
+  optional bytes error = 3;
 }
 
 message RequestHandling {
   required int64 callId = 1;
   required bytes data = 2;
+  repeated string protos = 3;
 }

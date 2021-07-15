@@ -3,8 +3,6 @@ package p2pd
 import (
 	"fmt"
 	"io"
-	"math/rand"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -13,10 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pb "github.com/libp2p/go-libp2p-daemon/pb"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func (d *Daemon) handleUpgradedConn(r ggio.Reader, w ggio.Writer) {
 	for {
@@ -52,7 +46,6 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, w ggio.Writer) {
 		}
 	}
 }
-
 func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 	if req.CallUnary == nil {
 		return malformedRequestErrorResponse()
@@ -65,34 +58,34 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 		)
 	}
 
-	protos := make([]protocol.ID, len(req.CallUnary.Proto))
-	for x, str := range req.CallUnary.Proto {
-		protos[x] = protocol.ID(str)
-	}
-
 	ctx, cancel := d.requestContext(req.CallUnary.GetTimeout())
 	defer cancel()
 
-	// TODO: cache streams
-	s, err := d.host.NewStream(ctx, pid, protos...)
+	remoteStream, err := d.host.NewStream(
+		ctx,
+		pid,
+		protocol.ConvertFromStrings(req.CallUnary.Protos)...,
+	)
 	if err != nil {
 		return errorResponse(err)
 	}
-	defer s.Close()
+	defer remoteStream.Close()
 
-	requestData := req.CallUnary.GetData()
-	if _, err := s.Write(requestData); err != nil {
-		return errorResponseString(
-			fmt.Sprintf("Failed to write message: %s", err.Error()),
-		)
+	// write proto message to remote
+	if err := ggio.NewDelimitedWriter(remoteStream).WriteMsg(req); err != nil {
+		return errorResponse(err)
+	}
+
+	remoteResp := &pb.Request{}
+	if err := ggio.NewDelimitedReader(remoteStream, network.MessageSizeMax).ReadMsg(remoteResp); err != nil {
+		return errorResponse(err)
 	}
 
 	resp := okResponse()
-	resp.CallUnaryResponse = &pb.CallUnaryResponse{}
-	if _, err := s.Read(resp.CallUnaryResponse.Result); err != nil {
-		return errorResponseString(
-			fmt.Sprintf("Failed to read message: %s", err.Error()),
-		)
+	// TODO: add erorrs
+	resp.CallUnaryResponse = &pb.CallUnaryResponse{
+		CallId: remoteResp.SendResponseToRemote.CallId,
+		Result: remoteResp.SendResponseToRemote.Data,
 	}
 
 	return resp
@@ -106,56 +99,50 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, req *pb.Request) *pb.Response 
 	d.mx.Lock()
 	defer d.mx.Unlock()
 
-	for _, sp := range req.AddUnaryHandler.Proto {
-		p := protocol.ID(sp)
-		if _, registered := d.registeredUnaryProtocols[p]; !registered {
-			d.host.SetStreamHandler(p, d.getPersistentStreamHandler(w))
-		}
-		log.Debugw("set unary stream handler", "protocol", sp)
+	p := protocol.ID(*req.AddUnaryHandler.Proto)
+	if _, registered := d.registeredUnaryProtocols[p]; !registered {
+		d.host.SetStreamHandler(p, d.getPersistentStreamHandler(w))
 	}
+	log.Debugw("set unary stream handler", "protocol", p)
 
 	return okResponse()
 }
 
+// getPersistentStreamHandler returns a lib-p2p stream handler tied to a
+// given persistent client stream
 func (d *Daemon) getPersistentStreamHandler(clientWriter ggio.Writer) network.StreamHandler {
 	return func(s network.Stream) {
-		msg := makeStreamInfo(s)
-		err := clientWriter.WriteMsg(msg)
-		if err != nil {
-			log.Debugw("error accepting stream", "error", err)
-			s.Reset()
+
+		req := &pb.Request{}
+		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(req); err != nil {
+			log.Debugw("failed to read proto from incoming p2p stream", err)
+			return
+		} else if req.CallUnary == nil {
+			log.Debugw("bad handler request: call data not specified")
 			return
 		}
 
-		// get request data from remote peer
-		var data []byte
-		if _, err := s.Read(data); err != nil {
-			log.Debugw("error reading request data", "error", err)
-			return
-		}
-
-		// now we need to request the client to handle this data
 		resp := okResponse()
-		callId := rand.Int63()
 		resp.RequestHandling = &pb.RequestHandling{
-			CallId: &callId,
-			Data:   data,
+			CallId: req.CallUnary.CallId,
+			Data:   req.CallUnary.Data,
+			Protos: req.CallUnary.Protos,
 		}
-		clientWriter.WriteMsg(resp)
+
+		if err := clientWriter.WriteMsg(resp); err != nil {
+			log.Debugw("failed to write message to client", err)
+			return
+		}
 
 		responseWaiter := make(chan *pb.Request)
-
 		d.responseWaiters.Store(
-			callId,
+			*req.CallUnary.CallId,
 			responseWaiter,
 		)
 
-		// and wait for it to return the results for us to write
-		// it to the remote peer
-
 		response := <-responseWaiter
-		if _, err := s.Write(response.SendResponseToRemote.Data); err != nil {
-			log.Debugw("failed to write response to remote", "error", err)
+		if err := ggio.NewDelimitedWriter(s).WriteMsg(response); err != nil {
+			log.Debugw("failed to write to p2p stream: ", err)
 			return
 		}
 	}
@@ -165,17 +152,17 @@ func (d *Daemon) doSendReponseToRemote(req *pb.Request) *pb.Response {
 	if req.SendResponseToRemote == nil {
 		return malformedRequestErrorResponse()
 	}
-	callId := *req.SendResponseToRemote
+	callID := *req.SendResponseToRemote.CallId
 
-	responseC, found := d.responseWaiters.LoadAndDelete(callId)
+	responseC, found := d.responseWaiters.LoadAndDelete(callID)
 	if !found {
 		return errorResponseString(
-			fmt.Sprintf("Response for call id %d not requested", *callId.CallId),
+			fmt.Sprintf("Response for call id %d not requested", callID),
 		)
 	}
 
 	responseChan := responseC.(chan *pb.Request)
 	responseChan <- req
 
-	return nil
+	return okResponse()
 }
