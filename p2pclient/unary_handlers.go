@@ -57,7 +57,7 @@ func (c *Client) getPersistentConn() (MultiplexedConn, error) {
 	return c.persistentConn, nil
 }
 
-func (c *Client) NewUnaryHandler(proto string, handler UnaryHandler) error {
+func (c *Client) NewUnaryHandler(proto protocol.ID, handler UnaryHandler) error {
 	control, err := c.getPersistentConn()
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (c *Client) NewUnaryHandler(proto string, handler UnaryHandler) error {
 	req := &pb.Request{
 		Type: pb.Request_ADD_UNARY_HANDLER.Enum(),
 		AddUnaryHandler: &pb.AddUnaryHandlerRequest{
-			Proto: &proto,
+			Proto: (*string)(&proto),
 		},
 	}
 	if err := control.WriteRequest(req); err != nil {
@@ -104,7 +104,7 @@ func detachHandler(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
 				&pb.Request{
 					Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 					SendResponseToRemote: &pb.SendResponseToRemote{
-						CallId: req.RequestHandling.CallId,
+						CallId: &callID,
 						Data:   result,
 					},
 				},
@@ -146,6 +146,11 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 		return nil, NewRemoteError(*resp.CallUnaryResponse.Error)
 	}
 
+	if pb.Response_ERROR == resp.GetType() {
+		errMsg := *resp.Error.Msg
+		return nil, fmt.Errorf(errMsg)
+	}
+
 	return resp.CallUnaryResponse.Result, nil
 }
 
@@ -168,6 +173,7 @@ func errorUnaryCallResponse(callID int64, err error) *pb.Request {
 		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 		SendResponseToRemote: &pb.SendResponseToRemote{
 			CallId: &callID,
+			Data:   make([]byte, 0),
 			Error:  &errMsg,
 		},
 	}

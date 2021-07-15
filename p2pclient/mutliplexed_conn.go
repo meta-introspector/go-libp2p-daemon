@@ -86,6 +86,7 @@ func responseErrorProtoNotFound(callId int64, p protocol.ID) *pb.Request {
 		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 		SendResponseToRemote: &pb.SendResponseToRemote{
 			CallId: &callId,
+			Data:   make([]byte, 0),
 			Error:  &errMsg,
 		},
 	}
@@ -95,6 +96,7 @@ func (mc *multiplexedConn) doHandleRequest(msg *pb.Response) {
 	protoID := protocol.ID(*msg.RequestHandling.Proto)
 	hc, found := mc.handleTasks.Load(protoID)
 	if !found {
+		fmt.Println("not found")
 		mc.writer.WriteMsg(
 			responseErrorProtoNotFound(
 				*msg.RequestHandling.CallId,

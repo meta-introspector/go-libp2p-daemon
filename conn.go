@@ -2,6 +2,7 @@ package p2pd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -66,7 +67,6 @@ func (d *Daemon) handleConn(c net.Conn) {
 			}
 
 			if s != nil {
-				// TODO: io.PipeWriters?
 				d.doStreamPipe(c, s)
 				return
 			}
@@ -157,8 +157,12 @@ func (d *Daemon) handleConn(c net.Conn) {
 			fallthrough
 		case pb.Request_CALL_UNARY:
 			if err := w.WriteMsg(
-				// TODO: return better error message
-				errorResponseString("Can't satisfy request through non-persistent stream"),
+				errorResponseString(
+					fmt.Sprintf(
+						"can't satisfy %s request through non-persistent stream",
+						req.GetType().String(),
+					),
+				),
 			); err != nil {
 				log.Debugw("error writing response", "error", err)
 				return
@@ -343,6 +347,7 @@ func errorUnaryCall(callID int64, err error) *pb.Response {
 	resp := errorResponse(err)
 	resp.CallUnaryResponse = &pb.CallUnaryResponse{
 		CallId: &callID,
+		Result: make([]byte, 0),
 	}
 	return resp
 }

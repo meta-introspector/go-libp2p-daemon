@@ -23,7 +23,6 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 			log.Debugw("error reading message", "error", err)
 			return
 		}
-
 		log.Debugw("request", "type", req.GetType())
 
 		switch req.GetType() {
@@ -115,6 +114,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, req *pb.Request) *pb.Response 
 // given persistent client stream
 func (d *Daemon) getPersistentStreamHandler(clientWriter ggio.Writer) network.StreamHandler {
 	return func(s network.Stream) {
+		defer s.Close()
 
 		req := &pb.Request{}
 		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(req); err != nil {
