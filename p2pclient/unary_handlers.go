@@ -11,23 +11,30 @@ import (
 	pb "github.com/libp2p/go-libp2p-daemon/pb"
 )
 
+var defaultTimeout = int64(1)
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
 type UnaryHandler func([]byte) ([]byte, error)
 
-func (c *Client) ensurePersistentConn() error {
-	if c.persistentConn == nil {
-		conn, err := c.getPersistentConn()
-		if err != nil {
-			return err
-		}
-
-		c.persistentConn = conn
+func (uh UnaryHandler) handle(c MultiplexedConn, callID int64, req *pb.Response) {
+	result, err := uh(req.RequestHandling.Data)
+	if err != nil {
+		c.WriteRequest(errorUnaryCallResponse(callID, err))
+		return
 	}
 
-	return nil
+	c.WriteRequest(
+		&pb.Request{
+			Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+			SendResponseToRemote: &pb.SendResponseToRemote{
+				CallId: &callID,
+				Data:   result,
+			},
+		},
+	)
 }
 
 func (c *Client) getPersistentConn() (MultiplexedConn, error) {
@@ -45,7 +52,6 @@ func (c *Client) getPersistentConn() (MultiplexedConn, error) {
 		network.MessageSizeMax,
 	)
 
-	// upgrade control connection to a persistent one
 	if err := c.persistentConn.WriteRequest(
 		&pb.Request{
 			Type: pb.Request_PERSISTENT_CONN_UPGRADE.Enum(),
@@ -73,18 +79,16 @@ func (c *Client) NewUnaryHandler(proto protocol.ID, handler UnaryHandler) error 
 		return err
 	}
 
-	go detachHandler(
+	go listenProtoRequests(
 		control,
 		protocol.ID(proto),
 		handler,
 	)
 
-	// TODO: get status
-
 	return nil
 }
 
-func detachHandler(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
+func listenProtoRequests(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
 	for {
 		req, err := c.ReadUnaryRequest(proto)
 		if err != nil {
@@ -92,24 +96,8 @@ func detachHandler(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
 			return
 		}
 
-		go func() {
-			callID := *req.RequestHandling.CallId
-			result, err := handler(req.RequestHandling.Data)
-			if err != nil {
-				c.WriteRequest(errorUnaryCallResponse(callID, err))
-				return
-			}
-
-			c.WriteRequest(
-				&pb.Request{
-					Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
-					SendResponseToRemote: &pb.SendResponseToRemote{
-						CallId: &callID,
-						Data:   result,
-					},
-				},
-			)
-		}()
+		callID := *req.RequestHandling.CallId
+		go handler.handle(c, callID, req)
 	}
 }
 
@@ -120,17 +108,15 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 	}
 
 	callID := rand.Int63()
-	timeout := int64(1)
 
 	req := &pb.Request{
 		Type: pb.Request_CALL_UNARY.Enum(),
 		CallUnary: &pb.CallUnaryRequest{
-			Peer:   []byte(p),
-			Proto:  (*string)(&proto),
-			Data:   data,
-			CallId: &callID,
-			// TODO: client option
-			Timeout: &timeout,
+			Peer:    []byte(p),
+			Proto:   (*string)(&proto),
+			Data:    data,
+			CallId:  &callID,
+			Timeout: &defaultTimeout,
 		},
 	}
 

@@ -28,8 +28,6 @@ type Client struct {
 	handlers  map[string]StreamHandlerFunc
 
 	persistentConn MultiplexedConn
-	// maps protocol id to unary handler
-	unaryHandlers sync.Map
 }
 
 // NewClient creates a new libp2p daemon client, connecting to a daemon

@@ -74,12 +74,14 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 	}
 	defer remoteStream.Close()
 
-	if err := ggio.NewDelimitedWriter(remoteStream).WriteMsg(req); err != nil {
+	if err := ggio.NewDelimitedWriter(remoteStream).
+		WriteMsg(req); err != nil {
 		return errorUnaryCall(callID, err)
 	}
 
 	remoteResp := &pb.Request{}
-	if err := ggio.NewDelimitedReader(remoteStream, network.MessageSizeMax).ReadMsg(remoteResp); err != nil {
+	if err := ggio.NewDelimitedReader(remoteStream, network.MessageSizeMax).
+		ReadMsg(remoteResp); err != nil {
 		return errorUnaryCall(callID, err)
 	}
 
@@ -112,12 +114,13 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, req *pb.Request) *pb.Response 
 
 // getPersistentStreamHandler returns a lib-p2p stream handler tied to a
 // given persistent client stream
-func (d *Daemon) getPersistentStreamHandler(clientWriter ggio.Writer) network.StreamHandler {
+func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandler {
 	return func(s network.Stream) {
 		defer s.Close()
 
 		req := &pb.Request{}
-		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(req); err != nil {
+		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).
+			ReadMsg(req); err != nil {
 			log.Debugw("failed to read proto from incoming p2p stream", err)
 			return
 		} else if req.CallUnary == nil {
@@ -132,18 +135,18 @@ func (d *Daemon) getPersistentStreamHandler(clientWriter ggio.Writer) network.St
 			Proto:  req.CallUnary.Proto,
 		}
 
-		if err := clientWriter.WriteMsg(resp); err != nil {
+		if err := cw.WriteMsg(resp); err != nil {
 			log.Debugw("failed to write message to client", err)
 			return
 		}
 
-		responseWaiter := make(chan *pb.Request)
+		rWaiter := make(chan *pb.Request)
 		d.responseWaiters.Store(
 			*req.CallUnary.CallId,
-			responseWaiter,
+			rWaiter,
 		)
 
-		response := <-responseWaiter
+		response := <-rWaiter
 		if err := ggio.NewDelimitedWriter(s).WriteMsg(response); err != nil {
 			log.Debugw("failed to write to p2p stream: ", err)
 			return

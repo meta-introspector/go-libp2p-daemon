@@ -75,7 +75,9 @@ message StreamHandlerRequest {
   repeated string proto = 2;
 }
 
-message ErrorResponse { required string msg = 1; }
+message ErrorResponse {
+  required string msg = 1;
+}
 
 message StreamInfo {
   required bytes peer = 1;
@@ -136,7 +138,9 @@ message ConnManagerRequest {
   optional int64 weight = 4;
 }
 
-message DisconnectRequest { required bytes peer = 1; }
+message DisconnectRequest {
+  required bytes peer = 1;
+}
 
 message PSRequest {
   enum Type {
