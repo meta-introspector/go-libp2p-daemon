@@ -20,7 +20,7 @@ type multiplexedConn struct {
 	wm sync.Mutex
 
 	writer ggio.Writer
-	reader ggio.Reader
+	reader ggio.ReadCloser
 
 	handleTasks sync.Map
 	callResults sync.Map
@@ -38,6 +38,7 @@ func NewMultiplexedConn(conn manet.Conn, messageSizeMax int) *multiplexedConn {
 }
 
 func (mc *multiplexedConn) listen() {
+	defer mc.reader.Close()
 	for {
 		msg := &pb.Response{}
 		if err := mc.reader.ReadMsg(msg); err != nil {
@@ -77,6 +78,8 @@ func (mc *multiplexedConn) ReadUnaryRequest(proto protocol.ID) (*pb.Response, er
 func (mc *multiplexedConn) ReadUnaryResponse(callID int64) (*pb.Response, error) {
 	cn := make(chan *pb.Response)
 	mc.callResults.Store(callID, cn)
+	defer mc.callResults.Delete(callID)
+
 	return <-cn, nil
 }
 
