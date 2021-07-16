@@ -32,27 +32,25 @@ func (uh UnaryHandler) handle(c MultiplexedConn, callID int64, req *pb.Response)
 }
 
 func (c *Client) getPersistentConn() (MultiplexedConn, error) {
-	if c.persistentConn != nil {
-		return c.persistentConn, nil
-	}
+	c.openPersistentConn.Do(func() {
+		control, err := c.newControlConn()
+		if err != nil {
+			panic(err)
+		}
 
-	control, err := c.newControlConn()
-	if err != nil {
-		return nil, err
-	}
+		c.persistentConn = NewMultiplexedConn(
+			control,
+			network.MessageSizeMax,
+		)
 
-	c.persistentConn = NewMultiplexedConn(
-		control,
-		network.MessageSizeMax,
-	)
-
-	if err := c.persistentConn.WriteRequest(
-		&pb.Request{
-			Type: pb.Request_PERSISTENT_CONN_UPGRADE.Enum(),
-		},
-	); err != nil {
-		return nil, err
-	}
+		if err := c.persistentConn.WriteRequest(
+			&pb.Request{
+				Type: pb.Request_PERSISTENT_CONN_UPGRADE.Enum(),
+			},
+		); err != nil {
+			panic(err)
+		}
+	})
 
 	return c.persistentConn, nil
 }
