@@ -26,6 +26,8 @@ type multiplexedConn struct {
 	callResults sync.Map
 }
 
+var _ MultiplexedConn = (*multiplexedConn)(nil)
+
 func NewMultiplexedConn(conn manet.Conn, messageSizeMax int) *multiplexedConn {
 	control := &multiplexedConn{
 		writer: ggio.NewDelimitedWriter(conn),

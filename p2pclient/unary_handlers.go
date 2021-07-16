@@ -134,16 +134,21 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 	return resp.CallUnaryResponse.Result, nil
 }
 
-func NewRemoteError(message string) *RemoteError {
-	return &RemoteError{message}
+func IsRemoteError(err error) bool {
+	_, ok := err.(*remoteError)
+	return ok
 }
 
-// RemoteError is returned when remote peer failed to handle a request
-type RemoteError struct {
+func NewRemoteError(message string) *remoteError {
+	return &remoteError{message}
+}
+
+// remoteError is returned when remote peer failed to handle a request
+type remoteError struct {
 	msg string
 }
 
-func (re *RemoteError) Error() string {
+func (re *remoteError) Error() string {
 	return fmt.Sprintf("remote peer failed to handle request: %s", re.msg)
 }
 

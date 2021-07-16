@@ -37,7 +37,7 @@ message Request {
 
 message Response {
   enum Type {
-    OK = 0;
+    OK    = 0;
     ERROR = 1;
   }
 

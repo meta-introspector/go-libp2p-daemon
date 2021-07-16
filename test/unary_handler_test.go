@@ -135,9 +135,6 @@ loop:
 			if counter == numJobs {
 				break loop
 			}
-		case <-time.NewTimer(time.Second * 20).C:
-			t.Fatalf("test timed out. only %d out of %d jobs finished", counter, numJobs)
-			break loop
 		}
 	}
 
