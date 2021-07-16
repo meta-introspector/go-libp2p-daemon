@@ -83,11 +83,11 @@ func (mc *multiplexedConn) ReadUnaryResponse(callID int64) (*pb.Response, error)
 func responseErrorProtoNotFound(callId int64, p protocol.ID) *pb.Request {
 	errMsg := fmt.Sprintf("protocol %s not supported", p)
 	return &pb.Request{
-		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+		Type:   pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+		CallId: &callId,
 		SendResponseToRemote: &pb.SendResponseToRemote{
-			CallId: &callId,
-			Data:   make([]byte, 0),
-			Error:  &errMsg,
+			Data:  make([]byte, 0),
+			Error: &errMsg,
 		},
 	}
 }
@@ -99,7 +99,7 @@ func (mc *multiplexedConn) doHandleRequest(msg *pb.Response) {
 		fmt.Println("not found")
 		mc.writer.WriteMsg(
 			responseErrorProtoNotFound(
-				*msg.RequestHandling.CallId,
+				*msg.CallId,
 				protoID,
 			),
 		)
@@ -109,7 +109,7 @@ func (mc *multiplexedConn) doHandleRequest(msg *pb.Response) {
 }
 
 func (mc *multiplexedConn) doReturnResponse(msg *pb.Response) {
-	callID := *msg.CallUnaryResponse.CallId
+	callID := *msg.CallId
 	cr, found := mc.callResults.Load(callID)
 	if !found {
 		return

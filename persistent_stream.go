@@ -54,7 +54,7 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 		return malformedRequestErrorResponse()
 	}
 
-	callID := *req.CallUnary.CallId
+	callID := *req.CallId
 
 	pid, err := peer.IDFromBytes(req.CallUnary.Peer)
 	if err != nil {
@@ -86,8 +86,8 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 	}
 
 	resp := okResponse()
+	resp.CallId = remoteResp.CallId
 	resp.CallUnaryResponse = &pb.CallUnaryResponse{
-		CallId: remoteResp.SendResponseToRemote.CallId,
 		Result: remoteResp.SendResponseToRemote.Data,
 		Error:  remoteResp.SendResponseToRemote.Error,
 	}
@@ -129,10 +129,10 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		}
 
 		resp := okResponse()
+		resp.CallId = req.CallId
 		resp.RequestHandling = &pb.RequestHandling{
-			CallId: req.CallUnary.CallId,
-			Data:   req.CallUnary.Data,
-			Proto:  req.CallUnary.Proto,
+			Data:  req.CallUnary.Data,
+			Proto: req.CallUnary.Proto,
 		}
 
 		if err := cw.WriteMsg(resp); err != nil {
@@ -142,7 +142,7 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 
 		rWaiter := make(chan *pb.Request)
 		d.responseWaiters.Store(
-			*req.CallUnary.CallId,
+			*req.CallId,
 			rWaiter,
 		)
 
@@ -158,7 +158,7 @@ func (d *Daemon) doSendReponseToRemote(req *pb.Request) *pb.Response {
 	if req.SendResponseToRemote == nil {
 		return malformedRequestErrorResponse()
 	}
-	callID := *req.SendResponseToRemote.CallId
+	callID := *req.CallId
 
 	responseC, found := d.responseWaiters.LoadAndDelete(callID)
 	if !found {

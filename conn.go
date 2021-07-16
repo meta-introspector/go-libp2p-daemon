@@ -345,8 +345,8 @@ func errorResponseString(err string) *pb.Response {
 
 func errorUnaryCall(callID int64, err error) *pb.Response {
 	resp := errorResponse(err)
+	resp.CallId = &callID
 	resp.CallUnaryResponse = &pb.CallUnaryResponse{
-		CallId: &callID,
 		Result: make([]byte, 0),
 	}
 	return resp

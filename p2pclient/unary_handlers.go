@@ -2,8 +2,6 @@ package p2pclient
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -12,10 +10,6 @@ import (
 )
 
 var defaultTimeout = int64(1)
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 type UnaryHandler func([]byte) ([]byte, error)
 
@@ -28,10 +22,10 @@ func (uh UnaryHandler) handle(c MultiplexedConn, callID int64, req *pb.Response)
 
 	c.WriteRequest(
 		&pb.Request{
-			Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+			Type:   pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+			CallId: &callID,
 			SendResponseToRemote: &pb.SendResponseToRemote{
-				CallId: &callID,
-				Data:   result,
+				Data: result,
 			},
 		},
 	)
@@ -69,11 +63,13 @@ func (c *Client) NewUnaryHandler(proto protocol.ID, handler UnaryHandler) error 
 		return err
 	}
 
+	callID := NewCallID()
 	req := &pb.Request{
 		Type: pb.Request_ADD_UNARY_HANDLER.Enum(),
 		AddUnaryHandler: &pb.AddUnaryHandlerRequest{
 			Proto: (*string)(&proto),
 		},
+		CallId: (*int64)(&callID),
 	}
 	if err := control.WriteRequest(req); err != nil {
 		return err
@@ -96,7 +92,7 @@ func listenProtoRequests(c MultiplexedConn, proto protocol.ID, handler UnaryHand
 			return
 		}
 
-		callID := *req.RequestHandling.CallId
+		callID := *req.CallId
 		go handler.handle(c, callID, req)
 	}
 }
@@ -107,15 +103,14 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 		return nil, err
 	}
 
-	callID := rand.Int63()
-
+	callID := NewCallID()
 	req := &pb.Request{
-		Type: pb.Request_CALL_UNARY.Enum(),
+		Type:   pb.Request_CALL_UNARY.Enum(),
+		CallId: &callID,
 		CallUnary: &pb.CallUnaryRequest{
 			Peer:    []byte(p),
 			Proto:   (*string)(&proto),
 			Data:    data,
-			CallId:  &callID,
 			Timeout: &defaultTimeout,
 		},
 	}
@@ -156,11 +151,11 @@ func (re *RemoteError) Error() string {
 func errorUnaryCallResponse(callID int64, err error) *pb.Request {
 	errMsg := err.Error()
 	return &pb.Request{
-		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+		Type:   pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+		CallId: &callID,
 		SendResponseToRemote: &pb.SendResponseToRemote{
-			CallId: &callID,
-			Data:   make([]byte, 0),
-			Error:  &errMsg,
+			Data:  make([]byte, 0),
+			Error: &errMsg,
 		},
 	}
 }
