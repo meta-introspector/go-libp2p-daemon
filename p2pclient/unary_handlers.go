@@ -22,10 +22,10 @@ func (uh UnaryHandler) handle(c MultiplexedConn, callID int64, req *pb.Response)
 
 	c.WriteRequest(
 		&pb.Request{
-			Type:   pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
-			CallId: &callID,
-			SendResponseToRemote: &pb.SendResponseToRemote{
-				Data: result,
+			Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+			SendResponseToRemote: &pb.CallUnaryResponse{
+				CallId: &callID,
+				Result: result,
 			},
 		},
 	)
@@ -63,13 +63,12 @@ func (c *Client) NewUnaryHandler(proto protocol.ID, handler UnaryHandler) error 
 		return err
 	}
 
-	callID := NewCallID()
+	// callID := NewCallID()
 	req := &pb.Request{
 		Type: pb.Request_ADD_UNARY_HANDLER.Enum(),
 		AddUnaryHandler: &pb.AddUnaryHandlerRequest{
 			Proto: (*string)(&proto),
 		},
-		CallId: (*int64)(&callID),
 	}
 	if err := control.WriteRequest(req); err != nil {
 		return err
@@ -92,7 +91,7 @@ func listenProtoRequests(c MultiplexedConn, proto protocol.ID, handler UnaryHand
 			return
 		}
 
-		callID := *req.CallId
+		callID := *req.RequestHandling.CallId
 		go handler.handle(c, callID, req)
 	}
 }
@@ -105,11 +104,11 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 
 	callID := NewCallID()
 	req := &pb.Request{
-		Type:   pb.Request_CALL_UNARY.Enum(),
-		CallId: &callID,
+		Type: pb.Request_CALL_UNARY.Enum(),
 		CallUnary: &pb.CallUnaryRequest{
 			Peer:    []byte(p),
 			Proto:   (*string)(&proto),
+			CallId:  &callID,
 			Data:    data,
 			Timeout: &defaultTimeout,
 		},
@@ -124,7 +123,9 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 	}
 
 	if resp.CallUnaryResponse.Error != nil {
-		return nil, NewRemoteError(*resp.CallUnaryResponse.Error)
+		errMsgBytes := resp.CallUnaryResponse.Error
+		errMsg := string(errMsgBytes)
+		return nil, NewRemoteError(errMsg)
 	}
 
 	if pb.Response_ERROR == resp.GetType() {
@@ -151,11 +152,11 @@ func (re *RemoteError) Error() string {
 func errorUnaryCallResponse(callID int64, err error) *pb.Request {
 	errMsg := err.Error()
 	return &pb.Request{
-		Type:   pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
-		CallId: &callID,
-		SendResponseToRemote: &pb.SendResponseToRemote{
-			Data:  make([]byte, 0),
-			Error: &errMsg,
+		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
+		SendResponseToRemote: &pb.CallUnaryResponse{
+			CallId: &callID,
+			Result: make([]byte, 0),
+			Error:  []byte(errMsg),
 		},
 	}
 }

@@ -32,9 +32,7 @@ message Request {
 
   optional CallUnaryRequest callUnary = 9;
   optional AddUnaryHandlerRequest addUnaryHandler = 10;
-  optional SendResponseToRemote sendResponseToRemote = 11;
-
-  optional int64 callId = 12;
+  optional CallUnaryResponse sendResponseToRemote = 11;
 }
 
 message Response {
@@ -52,9 +50,7 @@ message Response {
   optional PSResponse pubsub = 7;
 
   optional CallUnaryResponse callUnaryResponse = 8;
-  optional RequestHandling requestHandling = 9;
-
-  optional int64 callId = 10;
+  optional CallUnaryRequest requestHandling = 9;
 }
 
 message IdentifyResponse {
@@ -178,24 +174,16 @@ message CallUnaryRequest {
   required bytes peer = 1;
   required string proto = 2;
   required bytes data = 3;
+  required int64 callId = 4;
   optional int64 timeout = 5;
 }
 
 message CallUnaryResponse {
+  required int64 callId = 1;
   optional bytes result = 2;
-  optional string error = 3;
+  optional bytes error = 3;
 }
 
 message AddUnaryHandlerRequest {
   required string proto = 1;
-}
-
-message SendResponseToRemote {
-  required bytes data = 2;
-  optional string error = 3;
-}
-
-message RequestHandling {
-  required bytes data = 2;
-  required string proto = 3;
 }
