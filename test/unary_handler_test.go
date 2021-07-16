@@ -78,6 +78,7 @@ func TestUnaryCalls(t *testing.T) {
 
 // TODO: create benchmark
 func TestConcurrentUnaryCalls(t *testing.T) {
+	t.Skip("skipping slow test")
 	_, p1, cancel1 := createDaemonClientPair(t)
 	_, p2, cancel2 := createDaemonClientPair(t)
 
