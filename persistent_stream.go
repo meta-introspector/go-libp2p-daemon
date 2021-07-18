@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 
@@ -54,7 +55,7 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 		return malformedRequestErrorResponse()
 	}
 
-	callID := *req.CallUnary.CallId
+	callID := req.CallUnary.CallId
 
 	pid, err := peer.IDFromBytes(req.CallUnary.Peer)
 	if err != nil {
@@ -134,9 +135,14 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 			return
 		}
 
+		callID, err := uuid.FromBytes(req.CallUnary.CallId)
+		if err != nil {
+			cw.WriteMsg(errorResponseString("malformed request: call id not in UUID format"))
+		}
+
 		rWaiter := make(chan *pb.Request)
 		d.responseWaiters.Store(
-			*req.CallUnary.CallId,
+			callID,
 			rWaiter,
 		)
 
@@ -152,7 +158,13 @@ func (d *Daemon) doSendReponseToRemote(req *pb.Request) *pb.Response {
 	if req.SendResponseToRemote == nil {
 		return malformedRequestErrorResponse()
 	}
-	callID := *req.SendResponseToRemote.CallId
+
+	callID, err := uuid.FromBytes(req.SendResponseToRemote.CallId)
+	if err != nil {
+		return errorResponseString(
+			"mailformed request: call id not in UUID format",
+		)
+	}
 
 	responseC, found := d.responseWaiters.LoadAndDelete(callID)
 	if !found {

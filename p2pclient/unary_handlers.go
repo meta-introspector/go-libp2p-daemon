@@ -3,6 +3,7 @@ package p2pclient
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -13,7 +14,7 @@ var defaultTimeout = int64(1)
 
 type UnaryHandler func([]byte) ([]byte, error)
 
-func (uh UnaryHandler) handle(c MultiplexedConn, callID int64, req *pb.Response) {
+func (uh UnaryHandler) handle(c MultiplexedConn, callID []byte, req *pb.Response) {
 	result, err := uh(req.RequestHandling.Data)
 	if err != nil {
 		c.WriteRequest(errorUnaryCallResponse(callID, err))
@@ -24,7 +25,7 @@ func (uh UnaryHandler) handle(c MultiplexedConn, callID int64, req *pb.Response)
 		&pb.Request{
 			Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 			SendResponseToRemote: &pb.CallUnaryResponse{
-				CallId: &callID,
+				CallId: callID,
 				Result: result,
 			},
 		},
@@ -89,7 +90,7 @@ func listenProtoRequests(c MultiplexedConn, proto protocol.ID, handler UnaryHand
 			return
 		}
 
-		callID := *req.RequestHandling.CallId
+		callID := req.RequestHandling.CallId
 		go handler.handle(c, callID, req)
 	}
 }
@@ -100,13 +101,13 @@ func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, e
 		return nil, err
 	}
 
-	callID := NewCallID()
+	callID := uuid.New()
 	req := &pb.Request{
 		Type: pb.Request_CALL_UNARY.Enum(),
 		CallUnary: &pb.CallUnaryRequest{
 			Peer:    []byte(p),
 			Proto:   (*string)(&proto),
-			CallId:  &callID,
+			CallId:  callID[:],
 			Data:    data,
 			Timeout: &defaultTimeout,
 		},
@@ -152,12 +153,12 @@ func (re *remoteError) Error() string {
 	return fmt.Sprintf("remote peer failed to handle request: %s", re.msg)
 }
 
-func errorUnaryCallResponse(callID int64, err error) *pb.Request {
+func errorUnaryCallResponse(callID []byte, err error) *pb.Request {
 	errMsg := err.Error()
 	return &pb.Request{
 		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 		SendResponseToRemote: &pb.CallUnaryResponse{
-			CallId: &callID,
+			CallId: callID,
 			Result: make([]byte, 0),
 			Error:  []byte(errMsg),
 		},

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pb "github.com/libp2p/go-libp2p-daemon/pb"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -13,7 +14,7 @@ import (
 type MultiplexedConn interface {
 	WriteRequest(req *pb.Request) error
 	ReadUnaryRequest(proto protocol.ID) (*pb.Response, error)
-	ReadUnaryResponse(callId int64) (*pb.Response, error)
+	ReadUnaryResponse(callID uuid.UUID) (*pb.Response, error)
 }
 
 type multiplexedConn struct {
@@ -77,7 +78,7 @@ func (mc *multiplexedConn) ReadUnaryRequest(proto protocol.ID) (*pb.Response, er
 
 // ReadUnaryResponse locks until a response to a given call id is sent to
 // the persistent connection, then returns this response
-func (mc *multiplexedConn) ReadUnaryResponse(callID int64) (*pb.Response, error) {
+func (mc *multiplexedConn) ReadUnaryResponse(callID uuid.UUID) (*pb.Response, error) {
 	cn := make(chan *pb.Response)
 	mc.callResults.Store(callID, cn)
 	defer mc.callResults.Delete(callID)
@@ -85,14 +86,14 @@ func (mc *multiplexedConn) ReadUnaryResponse(callID int64) (*pb.Response, error)
 	return <-cn, nil
 }
 
-func responseErrorProtoNotFound(callId int64, p protocol.ID) *pb.Request {
+func responseErrorProtoNotFound(callID []byte, p protocol.ID) *pb.Request {
 	errMsg := []byte(fmt.Sprintf("protocol %s not supported", p))
 	return &pb.Request{
 		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
 		SendResponseToRemote: &pb.CallUnaryResponse{
 			Result: make([]byte, 0),
 			Error:  errMsg,
-			CallId: &callId,
+			CallId: callID,
 		},
 	}
 }
@@ -104,7 +105,7 @@ func (mc *multiplexedConn) doHandleRequest(msg *pb.Response) {
 		fmt.Println("not found")
 		mc.writer.WriteMsg(
 			responseErrorProtoNotFound(
-				*msg.RequestHandling.CallId,
+				msg.RequestHandling.CallId,
 				protoID,
 			),
 		)
@@ -114,7 +115,12 @@ func (mc *multiplexedConn) doHandleRequest(msg *pb.Response) {
 }
 
 func (mc *multiplexedConn) doReturnResponse(msg *pb.Response) {
-	callID := *msg.CallUnaryResponse.CallId
+	callID, err := uuid.FromBytes(msg.CallUnaryResponse.CallId)
+	// TODO: clean this mess up
+	if err != nil {
+		panic(err)
+	}
+
 	cr, found := mc.callResults.Load(callID)
 	if !found {
 		return
