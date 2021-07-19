@@ -75,8 +75,10 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 	}
 	defer remoteStream.Close()
 
-	if err := ggio.NewDelimitedWriter(remoteStream).
-		WriteMsg(req); err != nil {
+	// peer id now represents the callers peer id
+	req.CallUnary.Peer, _ = d.ID().MarshalBinary()
+
+	if err := ggio.NewDelimitedWriter(remoteStream).WriteMsg(req); err != nil {
 		return errorUnaryCall(callID, err)
 	}
 
