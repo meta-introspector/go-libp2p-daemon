@@ -26,9 +26,6 @@ type Client struct {
 
 	mhandlers sync.Mutex
 	handlers  map[string]StreamHandlerFunc
-
-	persistentConn     MultiplexedConn
-	openPersistentConn sync.Once
 }
 
 // NewClient creates a new libp2p daemon client, connecting to a daemon

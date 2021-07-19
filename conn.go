@@ -343,10 +343,6 @@ func errorResponseString(err string) *pb.Response {
 	}
 }
 
-func malformedRequestErrorResponse() *pb.Response {
-	return errorResponseString("Malformed request; missing parameters")
-}
-
 func makeStreamInfo(s network.Stream) *pb.StreamInfo {
 	proto := string(s.Protocol())
 	return &pb.StreamInfo{
