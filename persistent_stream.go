@@ -28,25 +28,31 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 
 		switch req.GetType() {
 		case pb.Request_CALL_UNARY:
-			resp := d.doUnaryCall(&req)
-			if err := w.WriteMsg(resp); err != nil {
-				log.Debugw("error reading message", "error", err)
-				return
-			}
+			go func() {
+				resp := d.doUnaryCall(&req)
+				if err := w.WriteMsg(resp); err != nil {
+					log.Debugw("error reading message", "error", err)
+					return
+				}
+			}()
 
 		case pb.Request_ADD_UNARY_HANDLER:
-			resp := d.doAddUnaryHandler(w, &req)
-			if err := w.WriteMsg(resp); err != nil {
-				log.Debugw("error reading message", "error", err)
-				return
-			}
+			go func() {
+				resp := d.doAddUnaryHandler(w, &req)
+				if err := w.WriteMsg(resp); err != nil {
+					log.Debugw("error reading message", "error", err)
+					return
+				}
+			}()
 
 		case pb.Request_SEND_RESPONSE_TO_REMOTE:
-			resp := d.doSendReponseToRemote(&req)
-			if err := w.WriteMsg(resp); err != nil {
-				log.Debugw("error reading message", "error", err)
-				return
-			}
+			go func() {
+				resp := d.doSendReponseToRemote(&req)
+				if err := w.WriteMsg(resp); err != nil {
+					log.Debugw("error reading message", "error", err)
+					return
+				}
+			}()
 		}
 	}
 }
@@ -89,7 +95,6 @@ func (d *Daemon) doUnaryCall(req *pb.Request) *pb.Response {
 	}
 
 	resp := okResponse()
-	// resp.CallId = remoteResp.CallId
 	resp.CallUnaryResponse = remoteResp.SendResponseToRemote
 
 	return resp
@@ -100,6 +105,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, req *pb.Request) *pb.Response 
 		return malformedRequestErrorResponse()
 	}
 
+	// x gon' give it to ya
 	d.mx.Lock()
 	defer d.mx.Unlock()
 
@@ -129,7 +135,6 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		}
 
 		resp := okResponse()
-		// resp.CallId = req.CallId
 		resp.RequestHandling = req.CallUnary
 
 		if err := cw.WriteMsg(resp); err != nil {
