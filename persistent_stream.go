@@ -29,25 +29,31 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 
 		switch req.Message.(type) {
 		case *pb.PCRequest_AddUnaryHandler:
-			resp := d.doAddUnaryHandler(w, callID, req.GetAddUnaryHandler())
-			if err := w.WriteMsg(resp); err != nil {
-				log.Debugw("error reading message", "error", err)
-				return
-			}
+			go func() {
+				resp := d.doAddUnaryHandler(w, callID, req.GetAddUnaryHandler())
+				if err := w.WriteMsg(resp); err != nil {
+					log.Debugw("error reading message", "error", err)
+					return
+				}
+			}()
 
 		case *pb.PCRequest_CallUnary:
-			resp := d.doUnaryCall(callID, &req)
-			if err := w.WriteMsg(resp); err != nil {
-				log.Debugw("error reading message", "error", err)
-				return
-			}
+			go func() {
+				resp := d.doUnaryCall(callID, &req)
+				if err := w.WriteMsg(resp); err != nil {
+					log.Debugw("error reading message", "error", err)
+					return
+				}
+			}()
 
 		case *pb.PCRequest_UnaryResponse:
-			resp := d.doSendReponseToRemote(&req)
-			if err := w.WriteMsg(resp); err != nil {
-				log.Debugw("error reading message", "error", err)
-				return
-			}
+			go func() {
+				resp := d.doSendReponseToRemote(&req)
+				if err := w.WriteMsg(resp); err != nil {
+					log.Debugw("error reading message", "error", err)
+					return
+				}
+			}()
 		}
 	}
 }
