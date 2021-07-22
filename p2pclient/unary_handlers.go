@@ -1,7 +1,6 @@
 package p2pclient
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -43,9 +42,6 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 	for {
 		var resp pb.PCResponse
 		r.ReadMsg(&resp)
-
-		result, err := json.Marshal(resp)
-		fmt.Println("received from daemon", string(result), err)
 
 		if _, ok := resp.Message.(*pb.PCResponse_RequestHandling); ok {
 			proto := protocol.ID(*resp.GetRequestHandling().Proto)

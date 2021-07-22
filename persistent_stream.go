@@ -1,7 +1,6 @@
 package p2pd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -16,11 +15,6 @@ import (
 	pb "github.com/libp2p/go-libp2p-daemon/pb"
 )
 
-func protoprint(m proto.Message) {
-	bytes, err := json.Marshal(m)
-	fmt.Println("received from client:", string(bytes), err)
-}
-
 func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 	w := &safeWriter{w: unsafeW}
 
@@ -31,7 +25,6 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 			return
 		}
 
-		protoprint(&req)
 		callID := req.CallId
 
 		switch req.Message.(type) {
@@ -43,7 +36,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 			}
 
 		case *pb.PCRequest_CallUnary:
-			resp := d.doUnaryCall(callID, req.GetCallUnary())
+			resp := d.doUnaryCall(callID, &req)
 			if err := w.WriteMsg(resp); err != nil {
 				log.Debugw("error reading message", "error", err)
 				return
@@ -58,38 +51,34 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 		}
 	}
 }
-func (d *Daemon) doUnaryCall(callID []byte, req *pb.CallUnaryRequest) *pb.PCResponse {
-	pid, err := peer.IDFromBytes(req.Peer)
+func (d *Daemon) doUnaryCall(callID []byte, req *pb.PCRequest) *pb.PCResponse {
+	pid, err := peer.IDFromBytes(req.GetCallUnary().Peer)
 	if err != nil {
 		return errorUnaryCall(callID, err)
 	}
 
-	ctx, cancel := d.requestContext(req.GetTimeout())
+	ctx, cancel := d.requestContext(req.GetCallUnary().GetTimeout())
 	defer cancel()
 
 	remoteStream, err := d.host.NewStream(
 		ctx,
 		pid,
-		protocol.ID(*req.Proto),
+		protocol.ID(*req.GetCallUnary().Proto),
 	)
 	if err != nil {
 		return errorUnaryCall(callID, err)
 	}
 	defer remoteStream.Close()
 
-	if err := ggio.NewDelimitedWriter(remoteStream).
-		WriteMsg(req); err != nil {
+	if err := ggio.NewDelimitedWriter(remoteStream).WriteMsg(req); err != nil {
 		return errorUnaryCall(callID, err)
 	}
 
-	fmt.Println("waddup?")
 	remoteResp := &pb.PCRequest{}
 	if err := ggio.NewDelimitedReader(remoteStream, network.MessageSizeMax).ReadMsg(remoteResp); err != nil {
-		fmt.Println("FAILED HERE")
 		return errorUnaryCall(callID, err)
 	}
 
-	fmt.Println("waddup?")
 	resp := okUnaryCallResponse(callID)
 	resp.Message = &pb.PCResponse_CallUnaryResponse{
 		CallUnaryResponse: remoteResp.GetUnaryResponse(),
@@ -161,7 +150,6 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 
 		response := <-rWaiter
 		if err := ggio.NewDelimitedWriter(s).WriteMsg(response); err != nil {
-			fmt.Println("shit shit shti sthi")
 			log.Debugw("failed to write to p2p stream: ", err)
 			return
 		}
