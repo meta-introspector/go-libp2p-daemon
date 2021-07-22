@@ -54,29 +54,27 @@ func TestUnaryCalls(t *testing.T) {
 		},
 	)
 
-	/*
-		t.Run(
-			"test bad request",
-			func(t *testing.T) {
-				_, err := p2.CallUnaryHandler(peer1ID, proto, float64Bytes(-64))
-				if err == nil {
-					t.Fatal("remote should have returned error")
-				}
-				t.Logf("remote correctly returned error: '%v'\n", err)
-			},
-		)
+	t.Run(
+		"test bad request",
+		func(t *testing.T) {
+			_, err := p2.CallUnaryHandler(peer1ID, proto, float64Bytes(-64))
+			if err == nil {
+				t.Fatal("remote should have returned error")
+			}
+			t.Logf("remote correctly returned error: '%v'\n", err)
+		},
+	)
 
-		t.Run(
-			"test bad proto",
-			func(t *testing.T) {
-				_, err := p2.CallUnaryHandler(peer1ID, "bad proto", make([]byte, 0))
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				t.Logf("remote correctly returned error: '%v'\n", err)
-			},
-		)
-	*/
+	t.Run(
+		"test bad proto",
+		func(t *testing.T) {
+			_, err := p2.CallUnaryHandler(peer1ID, "bad proto", make([]byte, 0))
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			t.Logf("remote correctly returned error: '%v'\n", err)
+		},
+	)
 }
 
 func float64FromBytes(bytes []byte) float64 {
