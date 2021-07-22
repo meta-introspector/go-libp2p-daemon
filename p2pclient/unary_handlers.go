@@ -8,159 +8,228 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pb "github.com/libp2p/go-libp2p-daemon/pb"
+
+	ggio "github.com/gogo/protobuf/io"
+	"github.com/gogo/protobuf/proto"
 )
 
-var defaultTimeout = int64(1)
+type PCResponseFuture chan *pb.PCResponse
 
-type UnaryHandler func([]byte) ([]byte, error)
+type UnaryHandlerFunc func([]byte) ([]byte, error)
 
-func (uh UnaryHandler) handle(c MultiplexedConn, callID []byte, req *pb.Response) {
-	result, err := uh(req.RequestHandling.Data)
+func (u UnaryHandlerFunc) handle(w ggio.Writer, req *pb.PCResponse) {
+	result, err := u(req.GetRequestHandling().Data)
+
+	var errMsg []byte
 	if err != nil {
-		c.WriteRequest(errorUnaryCallResponse(callID, err))
-		return
+		errMsg = []byte(err.Error())
 	}
 
-	c.WriteRequest(
-		&pb.Request{
-			Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
-			SendResponseToRemote: &pb.CallUnaryResponse{
-				CallId: callID,
-				Result: result,
+	w.WriteMsg(
+		&pb.PCRequest{
+			CallId: req.CallId,
+			Message: &pb.PCRequest_UnaryResponse{
+				UnaryResponse: &pb.CallUnaryResponse{
+					Result: result,
+					Error:  errMsg,
+				},
 			},
 		},
 	)
 }
 
-func (c *Client) getPersistentConn() (MultiplexedConn, error) {
-	c.openPersistentConn.Do(func() {
-		control, err := c.newControlConn()
-		if err != nil {
-			panic(err)
+func (c *Client) run(r ggio.Reader, w ggio.Writer) {
+	for {
+		var resp pb.PCResponse
+		r.ReadMsg(&resp)
+
+		if _, ok := resp.Message.(*pb.PCResponse_RequestHandling); ok {
+			proto := protocol.ID(*resp.GetRequestHandling().Proto)
+
+			c.mhandlers.Lock()
+			handler, found := c.unaryHandlers[proto]
+			if !found {
+				w.WriteMsg(makeErrProtoNotFoundMsg(resp.CallId, string(proto)))
+			}
+			c.mhandlers.Unlock()
+
+			go handler.handle(w, &resp)
+			continue
 		}
 
-		c.persistentConn = NewMultiplexedConn(
-			control,
-			network.MessageSizeMax,
-		)
+		go func() {
+			callID, err := uuid.FromBytes(resp.CallId)
+			if err != nil {
+				panic(err)
+			}
 
-		if err := c.persistentConn.WriteRequest(
-			&pb.Request{
-				Type: pb.Request_PERSISTENT_CONN_UPGRADE.Enum(),
-			},
-		); err != nil {
-			panic(err)
-		}
-	})
+			rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
+			rC.(PCResponseFuture) <- &resp
+		}()
+	}
 
-	return c.persistentConn, nil
 }
 
-func (c *Client) NewUnaryHandler(proto protocol.ID, handler UnaryHandler) error {
-	control, err := c.getPersistentConn()
-	if err != nil {
-		return err
-	}
+// getPersistentIO ensures persistent daemon connection and returns
+// readers and writers to it
+func (c *Client) getPersistentWriter() ggio.Writer {
+	c.openPersistentConn.Do(
+		func() {
+			conn, err := c.newControlConn()
+			if err != nil {
+				panic(err)
+			}
 
-	// callID := NewCallID()
-	req := &pb.Request{
-		Type: pb.Request_ADD_UNARY_HANDLER.Enum(),
-		AddUnaryHandler: &pb.AddUnaryHandlerRequest{
-			Proto: (*string)(&proto),
+			// write persistent connetion upgrade message to control
+			w := NewSafeWriter(ggio.NewDelimitedWriter(conn))
+			w.WriteMsg(&pb.Request{Type: pb.Request_PERSISTENT_CONN_UPGRADE.Enum()})
+			c.pConnWriter = w
+
+			// run persistent stream listener
+			r := ggio.NewDelimitedReader(conn, network.MessageSizeMax)
+			go c.run(r, c.pConnWriter)
+
 		},
+	)
+
+	return c.pConnWriter
+}
+
+// getResponse requests a response from the daemon for a given callID
+// TODO: add timeout support
+func (c *Client) getResponse(callID uuid.UUID) (*pb.PCResponse, error) {
+	rc, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
+	defer c.callFutures.Delete(callID)
+
+	response := <-rc.(PCResponseFuture)
+	if dErr := response.GetDaemonError(); dErr != nil {
+		return nil, newDaemonError(dErr)
 	}
-	if err := control.WriteRequest(req); err != nil {
+
+	return response, nil
+}
+
+// AddUnaryHandler registers unary handlers to daemon
+func (c *Client) AddUnaryHandler(proto protocol.ID, handler UnaryHandlerFunc) error {
+	w := c.getPersistentWriter()
+
+	callID := uuid.New()
+
+	w.WriteMsg(
+		&pb.PCRequest{
+			CallId: callID[:],
+			Message: &pb.PCRequest_AddUnaryHandler{
+				AddUnaryHandler: &pb.AddUnaryHandlerRequest{
+					Proto: (*string)(&proto),
+				},
+			},
+		},
+	)
+
+	if _, err := c.getResponse(callID); err != nil {
 		return err
 	}
 
-	go listenProtoRequests(
-		control,
-		protocol.ID(proto),
-		handler,
-	)
+	c.mhandlers.Lock()
+	c.unaryHandlers[proto] = handler
+	c.mhandlers.Unlock()
 
 	return nil
 }
 
-func listenProtoRequests(c MultiplexedConn, proto protocol.ID, handler UnaryHandler) {
-	for {
-		req, err := c.ReadUnaryRequest(proto)
-		if err != nil {
-			log.Debugw("failed to read request", err)
-			return
-		}
-
-		callID := req.RequestHandling.CallId
-		go handler.handle(c, callID, req)
-	}
-}
-
-func (c *Client) UnaryCall(p peer.ID, proto protocol.ID, data []byte) ([]byte, error) {
-	control, err := c.getPersistentConn()
-	if err != nil {
-		return nil, err
-	}
+func (c *Client) CallUnaryHandler(peerID peer.ID, proto protocol.ID, payload []byte) ([]byte, error) {
+	w := c.getPersistentWriter()
 
 	callID := uuid.New()
-	req := &pb.Request{
-		Type: pb.Request_CALL_UNARY.Enum(),
-		CallUnary: &pb.CallUnaryRequest{
-			Peer:    []byte(p),
-			Proto:   (*string)(&proto),
-			CallId:  callID[:],
-			Data:    data,
-			Timeout: &defaultTimeout,
-		},
-	}
 
-	if err := control.WriteRequest(req); err != nil {
-		return nil, err
-	}
-	resp, err := c.persistentConn.ReadUnaryResponse(callID)
+	// both methods don't return any errors
+	cid, _ := callID.MarshalBinary()
+	pid, _ := peerID.MarshalBinary()
+
+	w.WriteMsg(
+		&pb.PCRequest{
+			CallId: cid,
+			Message: &pb.PCRequest_CallUnary{
+				CallUnary: &pb.CallUnaryRequest{
+					Peer:  pid,
+					Proto: (*string)(&proto),
+					Data:  payload,
+				},
+			},
+		},
+	)
+
+	response, err := c.getResponse(callID)
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.CallUnaryResponse.Error != nil {
-		errMsgBytes := resp.CallUnaryResponse.Error
-		errMsg := string(errMsgBytes)
-		return nil, NewRemoteError(errMsg)
+	result := response.GetCallUnaryResponse()
+	if len(result.Error) != 0 {
+		return nil, newP2PHandlerError(result)
 	}
 
-	if pb.Response_ERROR == resp.GetType() {
-		errMsg := *resp.Error.Msg
-		return nil, fmt.Errorf(errMsg)
+	return result.Result, nil
+}
+
+func NewSafeWriter(w ggio.Writer) *safeWriter {
+	writer := &safeWriter{w, make(chan proto.Message)}
+	go writer.run()
+	return writer
+}
+
+type safeWriter struct {
+	w ggio.Writer
+	// message queue
+	mq chan proto.Message
+}
+
+func (sw *safeWriter) run() {
+	for msg := range sw.mq {
+		if err := sw.w.WriteMsg(msg); err != nil {
+			// TODO: or just close the .mq channel?
+			panic(err)
+		}
 	}
-
-	return resp.CallUnaryResponse.Result, nil
 }
 
-func IsRemoteError(err error) bool {
-	_, ok := err.(*remoteError)
-	return ok
+func (sw *safeWriter) WriteMsg(msg proto.Message) error {
+	sw.mq <- msg
+	return nil
 }
 
-func NewRemoteError(message string) *remoteError {
-	return &remoteError{message}
+func newDaemonError(dErr *pb.DaemonError) error {
+	return &DaemonError{message: *dErr.Message}
 }
 
-// remoteError is returned when remote peer failed to handle a request
-type remoteError struct {
-	msg string
+type DaemonError struct {
+	message string
 }
 
-func (re *remoteError) Error() string {
-	return fmt.Sprintf("remote peer failed to handle request: %s", re.msg)
+func (de *DaemonError) Error() string {
+	return de.message
 }
 
-func errorUnaryCallResponse(callID []byte, err error) *pb.Request {
-	errMsg := err.Error()
-	return &pb.Request{
-		Type: pb.Request_SEND_RESPONSE_TO_REMOTE.Enum(),
-		SendResponseToRemote: &pb.CallUnaryResponse{
-			CallId: callID,
-			Result: make([]byte, 0),
-			Error:  []byte(errMsg),
+func newP2PHandlerError(resp *pb.CallUnaryResponse) error {
+	return &P2PHandlerError{message: string(resp.Error)}
+}
+
+type P2PHandlerError struct {
+	message string
+}
+
+func (he *P2PHandlerError) Error() string {
+	return he.message
+}
+
+func makeErrProtoNotFoundMsg(callID []byte, proto string) *pb.PCRequest {
+	return &pb.PCRequest{
+		CallId: callID,
+		Message: &pb.PCRequest_UnaryResponse{
+			UnaryResponse: &pb.CallUnaryResponse{
+				Result: make([]byte, 0),
+				Error:  []byte(fmt.Sprintf("handler for protocl %s not found", proto)),
+			},
 		},
 	}
 }

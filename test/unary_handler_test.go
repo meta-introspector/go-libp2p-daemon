@@ -27,7 +27,7 @@ func TestUnaryCalls(t *testing.T) {
 	}
 
 	var proto protocol.ID = "sqrt"
-	p1.NewUnaryHandler(
+	if err := p1.AddUnaryHandler(
 		proto,
 		func(data []byte) ([]byte, error) {
 			f := float64FromBytes(data)
@@ -38,12 +38,14 @@ func TestUnaryCalls(t *testing.T) {
 			result := math.Sqrt(f)
 			return float64Bytes(result), nil
 		},
-	)
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run(
 		"test correct request",
 		func(t *testing.T) {
-			reply, err := p2.UnaryCall(peer1ID, proto, float64Bytes(64))
+			reply, err := p2.CallUnaryHandler(peer1ID, proto, float64Bytes(64))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -55,7 +57,7 @@ func TestUnaryCalls(t *testing.T) {
 	t.Run(
 		"test bad request",
 		func(t *testing.T) {
-			_, err := p2.UnaryCall(peer1ID, proto, float64Bytes(-64))
+			_, err := p2.CallUnaryHandler(peer1ID, proto, float64Bytes(-64))
 			if err == nil {
 				t.Fatal("remote should have returned error")
 			}
@@ -66,7 +68,7 @@ func TestUnaryCalls(t *testing.T) {
 	t.Run(
 		"test bad proto",
 		func(t *testing.T) {
-			_, err := p2.UnaryCall(peer1ID, "bad proto", make([]byte, 0))
+			_, err := p2.CallUnaryHandler(peer1ID, "bad proto", make([]byte, 0))
 			if err == nil {
 				t.Fatal("expected error")
 			}

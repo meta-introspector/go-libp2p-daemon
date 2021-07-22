@@ -343,19 +343,6 @@ func errorResponseString(err string) *pb.Response {
 	}
 }
 
-func errorUnaryCall(callID []byte, err error) *pb.Response {
-	resp := errorResponse(err)
-	resp.CallUnaryResponse = &pb.CallUnaryResponse{
-		CallId: callID,
-		Result: make([]byte, 0),
-	}
-	return resp
-}
-
-func malformedRequestErrorResponse() *pb.Response {
-	return errorResponseString("Malformed request; missing parameters")
-}
-
 func makeStreamInfo(s network.Stream) *pb.StreamInfo {
 	proto := string(s.Protocol())
 	return &pb.StreamInfo{
