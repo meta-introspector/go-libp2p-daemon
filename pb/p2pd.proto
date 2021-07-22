@@ -170,7 +170,6 @@ message PSRequest {
   optional bytes data = 3;
 }
 
-
 message PSMessage {
   optional bytes from = 1;
   optional bytes data = 2;
