@@ -46,6 +46,7 @@ type Daemon struct {
 	// maps call id's to wait channels
 	// callId (int64) -> channel to the go routine waiting for client response (chan *pb.Request)
 	responseWaiters sync.Map
+	cancelUnary     sync.Map
 }
 
 func NewDaemon(ctx context.Context, maddr ma.Multiaddr, dhtMode string, opts ...libp2p.Option) (*Daemon, error) {

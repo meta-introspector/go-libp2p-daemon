@@ -1,6 +1,7 @@
 package p2pclient
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -15,10 +16,10 @@ import (
 
 type PCResponseFuture chan *pb.PCResponse
 
-type UnaryHandlerFunc func([]byte) ([]byte, error)
+type UnaryHandlerFunc func(context.Context, []byte) ([]byte, error)
 
-func (u UnaryHandlerFunc) handle(w ggio.Writer, req *pb.PCResponse) {
-	result, err := u(req.GetRequestHandling().Data)
+func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PCResponse) {
+	result, err := u(ctx, req.GetRequestHandling().Data)
 
 	var errMsg []byte
 	if err != nil {
@@ -43,7 +44,14 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 		var resp pb.PCResponse
 		r.ReadMsg(&resp)
 
-		if _, ok := resp.Message.(*pb.PCResponse_RequestHandling); ok {
+		callID, err := uuid.FromBytes(resp.CallId)
+		if err != nil {
+			log.Debugw("received response with bad call id:", "error", err)
+			continue
+		}
+
+		switch resp.Message.(type) {
+		case *pb.PCResponse_RequestHandling:
 			proto := protocol.ID(*resp.GetRequestHandling().Proto)
 
 			c.mhandlers.Lock()
@@ -53,19 +61,23 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 			}
 			c.mhandlers.Unlock()
 
-			go handler.handle(w, &resp)
-			continue
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go handler.handle(ctx, w, &resp)
+
+		case *pb.PCResponse_Cancel:
+			go func() {
+				rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
+				rC.(PCResponseFuture) <- &resp
+			}()
+
+		case *pb.PCResponse_DaemonError, *pb.PCResponse_CallUnaryResponse, nil:
+			go func() {
+				rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
+				rC.(PCResponseFuture) <- &resp
+			}()
 		}
-
-		go func() {
-			callID, err := uuid.FromBytes(resp.CallId)
-			if err != nil {
-				panic(err)
-			}
-
-			rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
-			rC.(PCResponseFuture) <- &resp
-		}()
 	}
 
 }
@@ -137,7 +149,13 @@ func (c *Client) AddUnaryHandler(proto protocol.ID, handler UnaryHandlerFunc) er
 	return nil
 }
 
-func (c *Client) CallUnaryHandler(peerID peer.ID, proto protocol.ID, payload []byte) ([]byte, error) {
+func (c *Client) CallUnaryHandler(
+	ctx context.Context,
+	peerID peer.ID,
+	proto protocol.ID,
+	payload []byte,
+) ([]byte, error) {
+
 	w := c.getPersistentWriter()
 
 	callID := uuid.New()
@@ -145,6 +163,23 @@ func (c *Client) CallUnaryHandler(peerID peer.ID, proto protocol.ID, payload []b
 	// both methods don't return any errors
 	cid, _ := callID.MarshalBinary()
 	pid, _ := peerID.MarshalBinary()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			w.WriteMsg(
+				&pb.PCRequest{
+					CallId:  cid,
+					Message: &pb.PCRequest_Cancel{Cancel: &pb.Cancel{}},
+				},
+			)
+		}
+	}()
 
 	w.WriteMsg(
 		&pb.PCRequest{
@@ -164,12 +199,33 @@ func (c *Client) CallUnaryHandler(peerID peer.ID, proto protocol.ID, payload []b
 		return nil, err
 	}
 
+	if response.GetCancel() != nil {
+		return nil, ctx.Err()
+	}
+
 	result := response.GetCallUnaryResponse()
 	if len(result.Error) != 0 {
 		return nil, newP2PHandlerError(result)
 	}
 
-	return result.Result, nil
+	select {
+	case done <- struct{}{}:
+		return result.Result, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// Cancel cancelles a request w/ given id
+func (c *Client) Cancel(callID uuid.UUID) error {
+	return c.getPersistentWriter().WriteMsg(
+		&pb.PCRequest{
+			CallId: callID[:],
+			Message: &pb.PCRequest_Cancel{
+				Cancel: &pb.Cancel{},
+			},
+		},
+	)
 }
 
 func NewSafeWriter(w ggio.Writer) *safeWriter {
@@ -207,7 +263,7 @@ type DaemonError struct {
 }
 
 func (de *DaemonError) Error() string {
-	return de.message
+	return fmt.Sprintf("Daemon failed with %s:", de.message)
 }
 
 func newP2PHandlerError(resp *pb.CallUnaryResponse) error {
