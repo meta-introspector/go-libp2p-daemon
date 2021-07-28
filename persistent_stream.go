@@ -44,7 +44,6 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 
 		case *pb.PCRequest_CallUnary:
 			go func() {
-				// TODO: refactor
 				ctx, cancel := context.WithCancel(context.Background())
 				d.cancelUnary.Store(callID, cancel)
 				defer cancel()
