@@ -144,6 +144,8 @@ func TestAddUnaryHandler(t *testing.T) {
 		t.Fatal("closing client 1 should not have returned an error")
 	}
 
+	time.Sleep(time.Second * 3)
+
 	if err := c2.AddUnaryHandler(proto, sqrtHandler); err != nil {
 		t.Fatal("closing client 1 should have cleaned up the proto list", err)
 	}
