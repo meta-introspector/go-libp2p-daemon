@@ -204,6 +204,9 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 			return
 		}
 
+		// now the peer field points to the caller
+		req.GetCallUnary().Peer = []byte(s.Conn().RemotePeer())
+
 		callID, err := uuid.FromBytes(req.CallId)
 		if err != nil {
 			log.Debugw("bad call id in p2p handler", "error", err)
