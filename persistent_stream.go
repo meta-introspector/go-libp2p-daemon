@@ -17,6 +17,13 @@ import (
 )
 
 func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
+	var streamHandlers []string
+	defer func() {
+		for _, proto := range streamHandlers {
+			d.host.RemoveStreamHandler(protocol.ID(proto))
+		}
+	}()
+
 	w := &safeWriter{w: unsafeW}
 
 	for {
@@ -40,6 +47,11 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 					log.Debugw("error reading message", "error", err)
 					return
 				}
+
+				streamHandlers = append(
+					streamHandlers,
+					*req.GetAddUnaryHandler().Proto,
+				)
 			}()
 
 		case *pb.PCRequest_CallUnary:
