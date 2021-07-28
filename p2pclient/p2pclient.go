@@ -30,7 +30,7 @@ type Client struct {
 
 	openPersistentConn sync.Once
 	// persistent connection writer and reader
-	pConnWriter ggio.Writer
+	pConnWriter ggio.WriteCloser
 
 	callFutures   sync.Map
 	unaryHandlers map[protocol.ID]UnaryHandlerFunc

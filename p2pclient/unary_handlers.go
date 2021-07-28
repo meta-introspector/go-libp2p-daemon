@@ -3,6 +3,7 @@ package p2pclient
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -67,13 +68,7 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 				handler.handle(ctx, w, &resp)
 			}()
 
-		case *pb.PCResponse_Cancel:
-			go func() {
-				rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
-				rC.(PCResponseFuture) <- &resp
-			}()
-
-		case *pb.PCResponse_DaemonError, *pb.PCResponse_CallUnaryResponse, nil:
+		case *pb.PCResponse_DaemonError, *pb.PCResponse_CallUnaryResponse, *pb.PCResponse_Cancel, nil:
 			go func() {
 				rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
 				rC.(PCResponseFuture) <- &resp
@@ -85,7 +80,7 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 
 // getPersistentIO ensures persistent daemon connection and returns
 // readers and writers to it
-func (c *Client) getPersistentWriter() ggio.Writer {
+func (c *Client) getPersistentWriter() ggio.WriteCloser {
 	c.openPersistentConn.Do(
 		func() {
 			conn, err := c.newControlConn()
@@ -229,30 +224,26 @@ func (c *Client) Cancel(callID uuid.UUID) error {
 	)
 }
 
-func NewSafeWriter(w ggio.Writer) *safeWriter {
-	writer := &safeWriter{w, make(chan proto.Message)}
-	go writer.run()
-	return writer
+func NewSafeWriter(w ggio.WriteCloser) *safeWriter {
+	return &safeWriter{w: w}
 }
 
 type safeWriter struct {
-	w ggio.Writer
-	// message queue
-	mq chan proto.Message
-}
-
-func (sw *safeWriter) run() {
-	for msg := range sw.mq {
-		if err := sw.w.WriteMsg(msg); err != nil {
-			// TODO: or just close the .mq channel?
-			panic(err)
-		}
-	}
+	w ggio.WriteCloser
+	m sync.Mutex
 }
 
 func (sw *safeWriter) WriteMsg(msg proto.Message) error {
-	sw.mq <- msg
-	return nil
+	sw.m.Lock()
+	defer sw.m.Unlock()
+	return sw.w.WriteMsg(msg)
+}
+
+func (sw *safeWriter) Close() error {
+	sw.m.Lock()
+	defer sw.m.Unlock()
+
+	return sw.w.Close()
 }
 
 func newDaemonError(dErr *pb.DaemonError) error {

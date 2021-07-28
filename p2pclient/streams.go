@@ -126,9 +126,15 @@ func (c *Client) NewStream(peer peer.ID, protos []string) (*StreamInfo, io.ReadW
 // Close stops the listener address.
 func (c *Client) Close() error {
 	if c.listener != nil {
-		err := c.listener.Close()
-		return err
+		if err := c.listener.Close(); err != nil {
+			return err
+		}
 	}
+
+	if c.pConnWriter != nil {
+		return c.pConnWriter.Close()
+	}
+
 	return nil
 }
 

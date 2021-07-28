@@ -18,13 +18,14 @@ import (
 
 func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 	var streamHandlers []string
-	var shmx sync.Mutex
 	defer func() {
-		shmx.Lock()
-		defer shmx.Unlock()
+		d.mx.Lock()
+		defer d.mx.Unlock()
 
 		for _, proto := range streamHandlers {
-			d.host.RemoveStreamHandler(protocol.ID(proto))
+			p := protocol.ID(proto)
+			d.host.RemoveStreamHandler(p)
+			d.registeredUnaryProtocols[p] = false
 		}
 	}()
 
@@ -32,7 +33,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 
 	for {
 		var req pb.PCRequest
-		if err := r.ReadMsg(&req); err != nil && err != io.EOF {
+		if err := r.ReadMsg(&req); err != nil {
 			log.Debugw("error reading message", "error", err)
 			return
 		}
@@ -48,14 +49,14 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 			go func() {
 				resp := d.doAddUnaryHandler(w, callID, req.GetAddUnaryHandler())
 
-				shmx.Lock()
+				d.mx.Lock()
 				if _, ok := resp.Message.(*pb.PCResponse_DaemonError); !ok {
 					streamHandlers = append(
 						streamHandlers,
 						*req.GetAddUnaryHandler().Proto,
 					)
 				}
-				shmx.Unlock()
+				d.mx.Unlock()
 
 				if err := w.WriteMsg(resp); err != nil {
 					log.Debugw("error reading message", "error", err)
@@ -107,7 +108,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 	defer d.mx.Unlock()
 
 	p := protocol.ID(*req.Proto)
-	if _, registered := d.registeredUnaryProtocols[p]; registered {
+	if registered, _ := d.registeredUnaryProtocols[p]; registered {
 		return errorUnaryCallString(
 			callID,
 			fmt.Sprintf("handler for protocol %s already set", *req.Proto),
@@ -115,6 +116,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 	}
 
 	d.host.SetStreamHandler(p, d.getPersistentStreamHandler(w))
+	d.registeredUnaryProtocols[p] = true
 
 	log.Debugw("set unary stream handler", "protocol", p)
 
