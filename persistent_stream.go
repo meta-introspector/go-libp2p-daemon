@@ -18,7 +18,11 @@ import (
 
 func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 	var streamHandlers []string
+	var shmx sync.Mutex
 	defer func() {
+		shmx.Lock()
+		defer shmx.Unlock()
+
 		for _, proto := range streamHandlers {
 			d.host.RemoveStreamHandler(protocol.ID(proto))
 		}
@@ -43,15 +47,20 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 		case *pb.PCRequest_AddUnaryHandler:
 			go func() {
 				resp := d.doAddUnaryHandler(w, callID, req.GetAddUnaryHandler())
+
+				shmx.Lock()
+				if _, ok := resp.Message.(*pb.PCResponse_DaemonError); !ok {
+					streamHandlers = append(
+						streamHandlers,
+						*req.GetAddUnaryHandler().Proto,
+					)
+				}
+				shmx.Unlock()
+
 				if err := w.WriteMsg(resp); err != nil {
 					log.Debugw("error reading message", "error", err)
 					return
 				}
-
-				streamHandlers = append(
-					streamHandlers,
-					*req.GetAddUnaryHandler().Proto,
-				)
 			}()
 
 		case *pb.PCRequest_CallUnary:
