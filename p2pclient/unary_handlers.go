@@ -61,10 +61,11 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 			}
 			c.mhandlers.Unlock()
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			go handler.handle(ctx, w, &resp)
+			go func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				handler.handle(ctx, w, &resp)
+			}()
 
 		case *pb.PCResponse_Cancel:
 			go func() {
