@@ -3,7 +3,7 @@ syntax = "proto2";
 package p2pd.pb;
 
 message Request {
-   enum Type {
+  enum Type {
     IDENTIFY                 = 0;
     CONNECT                  = 1;
     STREAM_OPEN              = 2;
@@ -18,8 +18,8 @@ message Request {
     CALL_UNARY              = 10;
     ADD_UNARY_HANDLER       = 11;
     SEND_RESPONSE_TO_REMOTE = 12;
-
   }
+
   required Type type = 1;
 
   optional ConnectRequest connect = 2;
