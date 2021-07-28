@@ -15,10 +15,10 @@ func TestUnaryCalls(t *testing.T) {
 	_, p1, cancel1 := createDaemonClientPair(t)
 	_, p2, cancel2 := createDaemonClientPair(t)
 
-	t.Cleanup(func() {
+	defer func() {
 		cancel1()
 		cancel2()
-	})
+	}()
 
 	peer1ID, peer1Addrs, err := p1.Identify()
 	if err != nil {
@@ -45,6 +45,17 @@ func TestUnaryCalls(t *testing.T) {
 	}
 
 	t.Run(
+		"test bad request",
+		func(t *testing.T) {
+			_, err := p2.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(-64))
+			if err == nil {
+				t.Fatal("remote should have returned error")
+			}
+			t.Logf("remote correctly returned error: '%v'\n", err)
+		},
+	)
+
+	t.Run(
 		"test correct request",
 		func(t *testing.T) {
 			reply, err := p2.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(64))
@@ -53,17 +64,6 @@ func TestUnaryCalls(t *testing.T) {
 			}
 			result := float64FromBytes(reply)
 			t.Logf("remote returned: %f\n", result)
-		},
-	)
-
-	t.Run(
-		"test bad request",
-		func(t *testing.T) {
-			_, err := p2.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(-64))
-			if err == nil {
-				t.Fatal("remote should have returned error")
-			}
-			t.Logf("remote correctly returned error: '%v'\n", err)
 		},
 	)
 
@@ -97,13 +97,7 @@ func TestCancellation(t *testing.T) {
 	}
 
 	var proto protocol.ID = "sqrt"
-	if err := p1.AddUnaryHandler(
-		proto,
-		func(ctx context.Context, data []byte) ([]byte, error) {
-			time.Sleep(time.Second * 30)
-			return nil, nil
-		},
-	); err != nil {
+	if err := p1.AddUnaryHandler(proto, sqrtHandler); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,7 +105,53 @@ func TestCancellation(t *testing.T) {
 	defer cancel()
 
 	_, err = p2.CallUnaryHandler(ctx, peer1ID, proto, []byte("hi"))
-	t.Log("received error:", err)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestAddUnaryHandler(t *testing.T) {
+	// create a singe daemon and connect two client to it
+	dmaddr, c1maddr, dir1Closer := getEndpointsMaker(t)(t)
+	_, c2maddr, dir2Closer := getEndpointsMaker(t)(t)
+
+	daemon, closeDaemon := createDaemon(t, dmaddr)
+
+	c1, closeClient1 := createClient(t, daemon.Listener().Multiaddr(), c1maddr)
+	c2, closeClient2 := createClient(t, daemon.Listener().Multiaddr(), c2maddr)
+
+	defer func() {
+		closeClient1()
+		closeClient2()
+
+		closeDaemon()
+
+		dir1Closer()
+		dir2Closer()
+	}()
+
+	var proto protocol.ID = "sqrt"
+
+	if err := c1.AddUnaryHandler(proto, sqrtHandler); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c2.AddUnaryHandler(proto, sqrtHandler); err == nil {
+		t.Fatal("adding second unary handler with same name should have returned error")
+	}
+
+	if err := c1.Close(); err != nil {
+		t.Fatal("closing client 1 should not have returned an error")
+	}
+
+	if err := c2.AddUnaryHandler(proto, sqrtHandler); err != nil {
+		t.Fatal("closing client 1 should have cleaned up the proto list", err)
+	}
+}
+
+func sqrtHandler(ctx context.Context, data []byte) ([]byte, error) {
+	time.Sleep(time.Second * 30)
+	return nil, nil
 }
 
 func float64FromBytes(bytes []byte) float64 {
