@@ -108,7 +108,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 	defer d.mx.Unlock()
 
 	p := protocol.ID(*req.Proto)
-	if registered, _ := d.registeredUnaryProtocols[p]; registered {
+	if registered, found := d.registeredUnaryProtocols[p]; found && registered {
 		return errorUnaryCallString(
 			callID,
 			fmt.Sprintf("handler for protocol %s already set", *req.Proto),
