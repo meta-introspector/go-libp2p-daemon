@@ -139,7 +139,7 @@ func (d *Daemon) doUnaryCall(ctx context.Context, callID uuid.UUID, req *pb.PCRe
 	if err != nil {
 		return errorUnaryCall(callID, err)
 	}
-	defer remoteStream.Close()
+	// defer remoteStream.Close()
 
 	select {
 	case response := <-exchangeMessages(ctx, remoteStream, req):
@@ -217,7 +217,7 @@ func awaitReadFail(ctx context.Context, r io.Reader) <-chan struct{} {
 // given persistent client stream
 func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandler {
 	return func(s network.Stream) {
-		defer s.Close()
+		// defer s.Close()
 
 		// read request from remote peer
 		req := &pb.PCRequest{}
@@ -242,9 +242,6 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 
 		ctx, cancel := context.WithCancel(d.ctx)
 		defer cancel()
-
-		// TODO: do we need to check for cancelled context
-		// before sending handling request to client?
 
 		// request handling from daemon's client
 		resp := &pb.PCResponse{
