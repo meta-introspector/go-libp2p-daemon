@@ -24,9 +24,13 @@ func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PCR
 
 	response := &pb.CallUnaryResponse{}
 	if err == nil {
-		response.Result = &pb.CallUnaryResponse_Response{result}
+		response.Result = &pb.CallUnaryResponse_Response{
+			Response: result,
+		}
 	} else {
-		response.Result = &pb.CallUnaryResponse_Error{[]byte(err.Error())}
+		response.Result = &pb.CallUnaryResponse_Error{
+			Error: []byte(err.Error()),
+		}
 	}
 
 	w.WriteMsg(
