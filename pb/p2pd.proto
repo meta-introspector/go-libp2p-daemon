@@ -15,9 +15,6 @@ message Request {
     PUBSUB                   = 8;
 
     PERSISTENT_CONN_UPGRADE  = 9;
-    CALL_UNARY              = 10;
-    ADD_UNARY_HANDLER       = 11;
-    SEND_RESPONSE_TO_REMOTE = 12;
   }
 
   required Type type = 1;
@@ -194,8 +191,10 @@ message CallUnaryRequest {
 }
 
 message CallUnaryResponse {
-  optional bytes result = 1;
-  optional bytes error = 2;
+  oneof result {
+    bytes response = 1;
+    bytes error = 2;
+  }
 }
 
 message AddUnaryHandlerRequest {

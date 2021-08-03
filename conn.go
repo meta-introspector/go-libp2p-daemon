@@ -2,7 +2,6 @@ package p2pd
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"time"
@@ -150,23 +149,6 @@ func (d *Daemon) handleConn(c net.Conn) {
 		case pb.Request_PERSISTENT_CONN_UPGRADE:
 			d.handleUpgradedConn(r, w)
 			return
-
-		case pb.Request_ADD_UNARY_HANDLER:
-			fallthrough
-		case pb.Request_SEND_RESPONSE_TO_REMOTE:
-			fallthrough
-		case pb.Request_CALL_UNARY:
-			if err := w.WriteMsg(
-				errorResponseString(
-					fmt.Sprintf(
-						"can't satisfy %s request through non-persistent stream",
-						req.GetType().String(),
-					),
-				),
-			); err != nil {
-				log.Debugw("error writing response", "error", err)
-				return
-			}
 
 		default:
 			log.Debugw("unexpected request type", "type", req.GetType())

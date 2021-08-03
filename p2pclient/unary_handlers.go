@@ -22,19 +22,18 @@ type UnaryHandlerFunc func(context.Context, []byte) ([]byte, error)
 func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PCResponse) {
 	result, err := u(ctx, req.GetRequestHandling().Data)
 
-	var errMsg []byte
-	if err != nil {
-		errMsg = []byte(err.Error())
+	response := &pb.CallUnaryResponse{}
+	if err == nil {
+		response.Result = &pb.CallUnaryResponse_Response{result}
+	} else {
+		response.Result = &pb.CallUnaryResponse_Error{[]byte(err.Error())}
 	}
 
 	w.WriteMsg(
 		&pb.PCRequest{
 			CallId: req.CallId,
 			Message: &pb.PCRequest_UnaryResponse{
-				UnaryResponse: &pb.CallUnaryResponse{
-					Result: result,
-					Error:  errMsg,
-				},
+				UnaryResponse: response,
 			},
 		},
 	)
@@ -200,13 +199,13 @@ func (c *Client) CallUnaryHandler(
 	}
 
 	result := response.GetCallUnaryResponse()
-	if len(result.Error) != 0 {
+	if len(result.GetError()) != 0 {
 		return nil, newP2PHandlerError(result)
 	}
 
 	select {
 	case done <- struct{}{}:
-		return result.Result, nil
+		return result.GetResponse(), nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -259,7 +258,7 @@ func (de *DaemonError) Error() string {
 }
 
 func newP2PHandlerError(resp *pb.CallUnaryResponse) error {
-	return &P2PHandlerError{message: string(resp.Error)}
+	return &P2PHandlerError{message: string(resp.GetError())}
 }
 
 type P2PHandlerError struct {
@@ -275,8 +274,9 @@ func makeErrProtoNotFoundMsg(callID []byte, proto string) *pb.PCRequest {
 		CallId: callID,
 		Message: &pb.PCRequest_UnaryResponse{
 			UnaryResponse: &pb.CallUnaryResponse{
-				Result: make([]byte, 0),
-				Error:  []byte(fmt.Sprintf("handler for protocl %s not found", proto)),
+				Result: &pb.CallUnaryResponse_Error{
+					Error: []byte(fmt.Sprintf("handler for protocl %s not found", proto)),
+				},
 			},
 		},
 	}
