@@ -32,7 +32,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 	w := &safeWriter{w: unsafeW}
 
 	for {
-		var req pb.PCRequest
+		var req pb.PersistentConnectionRequest
 		if err := r.ReadMsg(&req); err != nil {
 			log.Debugw("error reading message", "error", err)
 			return
@@ -45,12 +45,12 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 		}
 
 		switch req.Message.(type) {
-		case *pb.PCRequest_AddUnaryHandler:
+		case *pb.PersistentConnectionRequest_AddUnaryHandler:
 			go func() {
 				resp := d.doAddUnaryHandler(w, callID, req.GetAddUnaryHandler())
 
 				d.mx.Lock()
-				if _, ok := resp.Message.(*pb.PCResponse_DaemonError); !ok {
+				if _, ok := resp.Message.(*pb.PersistentConnectionResponse_DaemonError); !ok {
 					streamHandlers = append(
 						streamHandlers,
 						*req.GetAddUnaryHandler().Proto,
@@ -64,7 +64,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 				}
 			}()
 
-		case *pb.PCRequest_CallUnary:
+		case *pb.PersistentConnectionRequest_CallUnary:
 			go func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				d.cancelUnary.Store(callID, cancel)
@@ -80,7 +80,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 				}
 			}()
 
-		case *pb.PCRequest_UnaryResponse:
+		case *pb.PersistentConnectionRequest_UnaryResponse:
 			go func() {
 				resp := d.doSendReponseToRemote(&req)
 				if err := w.WriteMsg(resp); err != nil {
@@ -89,7 +89,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 				}
 			}()
 
-		case *pb.PCRequest_Cancel:
+		case *pb.PersistentConnectionRequest_Cancel:
 			go func() {
 				cf, found := d.cancelUnary.Load(callID)
 				if !found {
@@ -102,7 +102,7 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 	}
 }
 
-func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddUnaryHandlerRequest) *pb.PCResponse {
+func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddUnaryHandlerRequest) *pb.PersistentConnectionResponse {
 	// x gon' give it to ya
 	d.mx.Lock()
 	defer d.mx.Unlock()
@@ -123,7 +123,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 	return okUnaryCallResponse(callID)
 }
 
-func (d *Daemon) doUnaryCall(ctx context.Context, callID uuid.UUID, req *pb.PCRequest) *pb.PCResponse {
+func (d *Daemon) doUnaryCall(ctx context.Context, callID uuid.UUID, req *pb.PersistentConnectionRequest) *pb.PersistentConnectionResponse {
 	// process request
 	pid, err := peer.IDFromBytes(req.GetCallUnary().Peer)
 	if err != nil {
@@ -150,9 +150,9 @@ func (d *Daemon) doUnaryCall(ctx context.Context, callID uuid.UUID, req *pb.PCRe
 	}
 }
 
-func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PCRequest) <-chan *pb.PCResponse {
+func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PersistentConnectionRequest) <-chan *pb.PersistentConnectionResponse {
 	callID, _ := uuid.FromBytes(req.CallId)
-	rc := make(chan *pb.PCResponse)
+	rc := make(chan *pb.PersistentConnectionResponse)
 
 	go func() {
 		defer close(rc)
@@ -166,7 +166,7 @@ func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PCRequest) 
 		}
 
 		// await response from remote
-		remoteResp := &pb.PCRequest{}
+		remoteResp := &pb.PersistentConnectionRequest{}
 		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(remoteResp); ctx.Err() != nil {
 			return
 		} else if err != nil {
@@ -176,7 +176,7 @@ func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PCRequest) 
 
 		// convert response to a persistent channel response
 		resp := okUnaryCallResponse(callID)
-		resp.Message = &pb.PCResponse_CallUnaryResponse{
+		resp.Message = &pb.PersistentConnectionResponse_CallUnaryResponse{
 			CallUnaryResponse: remoteResp.GetUnaryResponse(),
 		}
 
@@ -220,7 +220,7 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		defer s.Close()
 
 		// read request from remote peer
-		req := &pb.PCRequest{}
+		req := &pb.PersistentConnectionRequest{}
 		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(req); err != nil {
 			log.Debugw("failed to read proto from incoming p2p stream", "error", err)
 			return
@@ -236,7 +236,7 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		}
 
 		// create response channel
-		rc := make(chan *pb.PCRequest)
+		rc := make(chan *pb.PersistentConnectionRequest)
 		d.responseWaiters.Store(callID, rc)
 		defer d.responseWaiters.Delete(callID)
 
@@ -247,9 +247,9 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		// before sending handling request to client?
 
 		// request handling from daemon's client
-		resp := &pb.PCResponse{
+		resp := &pb.PersistentConnectionResponse{
 			CallId: req.CallId,
-			Message: &pb.PCResponse_RequestHandling{
+			Message: &pb.PersistentConnectionResponse_RequestHandling{
 				RequestHandling: req.GetCallUnary(),
 			},
 		}
@@ -262,9 +262,9 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		case <-awaitReadFail(ctx, s):
 			// tell the client he got cancelled
 			if err := cw.WriteMsg(
-				&pb.PCResponse{
+				&pb.PersistentConnectionResponse{
 					CallId: callID[:],
-					Message: &pb.PCResponse_Cancel{
+					Message: &pb.PersistentConnectionResponse_Cancel{
 						Cancel: &pb.Cancel{},
 					},
 				},
@@ -282,7 +282,7 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 	}
 }
 
-func (d *Daemon) doSendReponseToRemote(req *pb.PCRequest) *pb.PCResponse {
+func (d *Daemon) doSendReponseToRemote(req *pb.PersistentConnectionRequest) *pb.PersistentConnectionResponse {
 	callID, err := uuid.FromBytes(req.CallId)
 	if err != nil {
 		return errorUnaryCallString(
@@ -299,7 +299,7 @@ func (d *Daemon) doSendReponseToRemote(req *pb.PCRequest) *pb.PCResponse {
 		)
 	}
 
-	rc.(chan *pb.PCRequest) <- req
+	rc.(chan *pb.PersistentConnectionRequest) <- req
 
 	return okUnaryCallResponse(callID)
 }
@@ -315,33 +315,33 @@ func (sw *safeWriter) WriteMsg(msg proto.Message) error {
 	return sw.w.WriteMsg(msg)
 }
 
-func errorUnaryCall(callID uuid.UUID, err error) *pb.PCResponse {
+func errorUnaryCall(callID uuid.UUID, err error) *pb.PersistentConnectionResponse {
 	message := err.Error()
-	return &pb.PCResponse{
+	return &pb.PersistentConnectionResponse{
 		CallId: callID[:],
-		Message: &pb.PCResponse_DaemonError{
+		Message: &pb.PersistentConnectionResponse_DaemonError{
 			DaemonError: &pb.DaemonError{Message: &message},
 		},
 	}
 }
 
-func errorUnaryCallString(callID uuid.UUID, errMsg string) *pb.PCResponse {
-	return &pb.PCResponse{
+func errorUnaryCallString(callID uuid.UUID, errMsg string) *pb.PersistentConnectionResponse {
+	return &pb.PersistentConnectionResponse{
 		CallId: callID[:],
-		Message: &pb.PCResponse_DaemonError{
+		Message: &pb.PersistentConnectionResponse_DaemonError{
 			DaemonError: &pb.DaemonError{Message: &errMsg},
 		},
 	}
 }
 
-func okUnaryCallResponse(callID uuid.UUID) *pb.PCResponse {
-	return &pb.PCResponse{CallId: callID[:]}
+func okUnaryCallResponse(callID uuid.UUID) *pb.PersistentConnectionResponse {
+	return &pb.PersistentConnectionResponse{CallId: callID[:]}
 }
 
-func okCancelled(callID uuid.UUID) *pb.PCResponse {
-	return &pb.PCResponse{
+func okCancelled(callID uuid.UUID) *pb.PersistentConnectionResponse {
+	return &pb.PersistentConnectionResponse{
 		CallId: callID[:],
-		Message: &pb.PCResponse_Cancel{
+		Message: &pb.PersistentConnectionResponse_Cancel{
 			Cancel: &pb.Cancel{},
 		},
 	}

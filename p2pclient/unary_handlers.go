@@ -15,11 +15,11 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
-type PCResponseFuture chan *pb.PCResponse
+type PersistentConnectionResponseFuture chan *pb.PersistentConnectionResponse
 
 type UnaryHandlerFunc func(context.Context, []byte) ([]byte, error)
 
-func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PCResponse) {
+func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PersistentConnectionResponse) {
 	result, err := u(ctx, req.GetRequestHandling().Data)
 
 	response := &pb.CallUnaryResponse{}
@@ -34,9 +34,9 @@ func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PCR
 	}
 
 	w.WriteMsg(
-		&pb.PCRequest{
+		&pb.PersistentConnectionRequest{
 			CallId: req.CallId,
-			Message: &pb.PCRequest_UnaryResponse{
+			Message: &pb.PersistentConnectionRequest_UnaryResponse{
 				UnaryResponse: response,
 			},
 		},
@@ -45,7 +45,7 @@ func (u UnaryHandlerFunc) handle(ctx context.Context, w ggio.Writer, req *pb.PCR
 
 func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 	for {
-		var resp pb.PCResponse
+		var resp pb.PersistentConnectionResponse
 		r.ReadMsg(&resp)
 
 		callID, err := uuid.FromBytes(resp.CallId)
@@ -55,7 +55,7 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 		}
 
 		switch resp.Message.(type) {
-		case *pb.PCResponse_RequestHandling:
+		case *pb.PersistentConnectionResponse_RequestHandling:
 			proto := protocol.ID(*resp.GetRequestHandling().Proto)
 
 			c.mhandlers.Lock()
@@ -71,10 +71,10 @@ func (c *Client) run(r ggio.Reader, w ggio.Writer) {
 				handler.handle(ctx, w, &resp)
 			}()
 
-		case *pb.PCResponse_DaemonError, *pb.PCResponse_CallUnaryResponse, *pb.PCResponse_Cancel, nil:
+		case *pb.PersistentConnectionResponse_DaemonError, *pb.PersistentConnectionResponse_CallUnaryResponse, *pb.PersistentConnectionResponse_Cancel, nil:
 			go func() {
-				rC, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
-				rC.(PCResponseFuture) <- &resp
+				rC, _ := c.callFutures.LoadOrStore(callID, make(PersistentConnectionResponseFuture))
+				rC.(PersistentConnectionResponseFuture) <- &resp
 			}()
 		}
 	}
@@ -108,11 +108,11 @@ func (c *Client) getPersistentWriter() ggio.WriteCloser {
 
 // getResponse requests a response from the daemon for a given callID
 // TODO: add timeout support
-func (c *Client) getResponse(callID uuid.UUID) (*pb.PCResponse, error) {
-	rc, _ := c.callFutures.LoadOrStore(callID, make(PCResponseFuture))
+func (c *Client) getResponse(callID uuid.UUID) (*pb.PersistentConnectionResponse, error) {
+	rc, _ := c.callFutures.LoadOrStore(callID, make(PersistentConnectionResponseFuture))
 	defer c.callFutures.Delete(callID)
 
-	response := <-rc.(PCResponseFuture)
+	response := <-rc.(PersistentConnectionResponseFuture)
 	if dErr := response.GetDaemonError(); dErr != nil {
 		return nil, newDaemonError(dErr)
 	}
@@ -127,9 +127,9 @@ func (c *Client) AddUnaryHandler(proto protocol.ID, handler UnaryHandlerFunc) er
 	callID := uuid.New()
 
 	w.WriteMsg(
-		&pb.PCRequest{
+		&pb.PersistentConnectionRequest{
 			CallId: callID[:],
-			Message: &pb.PCRequest_AddUnaryHandler{
+			Message: &pb.PersistentConnectionRequest_AddUnaryHandler{
 				AddUnaryHandler: &pb.AddUnaryHandlerRequest{
 					Proto: (*string)(&proto),
 				},
@@ -172,18 +172,18 @@ func (c *Client) CallUnaryHandler(
 			return
 		case <-ctx.Done():
 			w.WriteMsg(
-				&pb.PCRequest{
+				&pb.PersistentConnectionRequest{
 					CallId:  cid,
-					Message: &pb.PCRequest_Cancel{Cancel: &pb.Cancel{}},
+					Message: &pb.PersistentConnectionRequest_Cancel{Cancel: &pb.Cancel{}},
 				},
 			)
 		}
 	}()
 
 	w.WriteMsg(
-		&pb.PCRequest{
+		&pb.PersistentConnectionRequest{
 			CallId: cid,
-			Message: &pb.PCRequest_CallUnary{
+			Message: &pb.PersistentConnectionRequest_CallUnary{
 				CallUnary: &pb.CallUnaryRequest{
 					Peer:  pid,
 					Proto: (*string)(&proto),
@@ -218,9 +218,9 @@ func (c *Client) CallUnaryHandler(
 // Cancel cancelles a request w/ given id
 func (c *Client) Cancel(callID uuid.UUID) error {
 	return c.getPersistentWriter().WriteMsg(
-		&pb.PCRequest{
+		&pb.PersistentConnectionRequest{
 			CallId: callID[:],
-			Message: &pb.PCRequest_Cancel{
+			Message: &pb.PersistentConnectionRequest_Cancel{
 				Cancel: &pb.Cancel{},
 			},
 		},
@@ -273,10 +273,10 @@ func (he *P2PHandlerError) Error() string {
 	return he.message
 }
 
-func makeErrProtoNotFoundMsg(callID []byte, proto string) *pb.PCRequest {
-	return &pb.PCRequest{
+func makeErrProtoNotFoundMsg(callID []byte, proto string) *pb.PersistentConnectionRequest {
+	return &pb.PersistentConnectionRequest{
 		CallId: callID,
-		Message: &pb.PCRequest_UnaryResponse{
+		Message: &pb.PersistentConnectionRequest_UnaryResponse{
 			UnaryResponse: &pb.CallUnaryResponse{
 				Result: &pb.CallUnaryResponse_Error{
 					Error: []byte(fmt.Sprintf("handler for protocl %s not found", proto)),
