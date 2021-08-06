@@ -94,20 +94,18 @@ func (c *Client) getPersistentWriter() ggio.WriteCloser {
 			// write persistent connetion upgrade message to control
 			w := NewSafeWriter(ggio.NewDelimitedWriter(conn))
 			w.WriteMsg(&pb.Request{Type: pb.Request_PERSISTENT_CONN_UPGRADE.Enum()})
-			c.pConnWriter = w
+			c.persistentConnWriter = w
 
 			// run persistent stream listener
 			r := ggio.NewDelimitedReader(conn, network.MessageSizeMax)
-			go c.run(r, c.pConnWriter)
+			go c.run(r, c.persistentConnWriter)
 
 		},
 	)
 
-	return c.pConnWriter
+	return c.persistentConnWriter
 }
 
-// getResponse requests a response from the daemon for a given callID
-// TODO: add timeout support
 func (c *Client) getResponse(callID uuid.UUID) (*pb.PersistentConnectionResponse, error) {
 	rc, _ := c.callFutures.LoadOrStore(callID, make(PersistentConnectionResponseFuture))
 	defer c.callFutures.Delete(callID)
@@ -120,7 +118,6 @@ func (c *Client) getResponse(callID uuid.UUID) (*pb.PersistentConnectionResponse
 	return response, nil
 }
 
-// AddUnaryHandler registers unary handlers to daemon
 func (c *Client) AddUnaryHandler(proto protocol.ID, handler UnaryHandlerFunc) error {
 	w := c.getPersistentWriter()
 
@@ -215,7 +212,6 @@ func (c *Client) CallUnaryHandler(
 	}
 }
 
-// Cancel cancelles a request w/ given id
 func (c *Client) Cancel(callID uuid.UUID) error {
 	return c.getPersistentWriter().WriteMsg(
 		&pb.PersistentConnectionRequest{

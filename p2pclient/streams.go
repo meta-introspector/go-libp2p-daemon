@@ -131,8 +131,8 @@ func (c *Client) Close() error {
 		}
 	}
 
-	if c.pConnWriter != nil {
-		return c.pConnWriter.Close()
+	if c.persistentConnWriter != nil {
+		return c.persistentConnWriter.Close()
 	}
 
 	return nil

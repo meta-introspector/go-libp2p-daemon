@@ -40,13 +40,14 @@ type Daemon struct {
 	// closed is set when the daemon is shutting down
 	closed bool
 
-	// used to check if a handler for a given protocol is
-	// already registered
 	registeredUnaryProtocols map[protocol.ID]bool
-	// maps call id's to wait channels
-	// callId (int64) -> channel to the go routine waiting for client response (chan *pb.Request)
+
+	// callID (int64) to chan *pb.PersistentConnectionResponse
+	// used to return responses to goroutines awating them
 	responseWaiters sync.Map
-	cancelUnary     sync.Map
+	// callID (int64) to chan context.CancelFunc
+	// used to cancel request handlers
+	cancelUnary sync.Map
 }
 
 func NewDaemon(ctx context.Context, maddr ma.Multiaddr, dhtMode string, opts ...libp2p.Option) (*Daemon, error) {

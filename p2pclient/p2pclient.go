@@ -28,9 +28,8 @@ type Client struct {
 	mhandlers sync.Mutex
 	handlers  map[string]StreamHandlerFunc
 
-	openPersistentConn sync.Once
-	// persistent connection writer and reader
-	pConnWriter ggio.WriteCloser
+	openPersistentConn   sync.Once
+	persistentConnWriter ggio.WriteCloser
 
 	callFutures   sync.Map
 	unaryHandlers map[protocol.ID]UnaryHandlerFunc

@@ -103,7 +103,6 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 }
 
 func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddUnaryHandlerRequest) *pb.PersistentConnectionResponse {
-	// x gon' give it to ya
 	d.mx.Lock()
 	defer d.mx.Unlock()
 
@@ -124,13 +123,11 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 }
 
 func (d *Daemon) doUnaryCall(ctx context.Context, callID uuid.UUID, req *pb.PersistentConnectionRequest) *pb.PersistentConnectionResponse {
-	// process request
 	pid, err := peer.IDFromBytes(req.GetCallUnary().Peer)
 	if err != nil {
 		return errorUnaryCall(callID, err)
 	}
 
-	// open stream to remote
 	remoteStream, err := d.host.NewStream(
 		ctx,
 		pid,
@@ -157,7 +154,6 @@ func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PersistentC
 	go func() {
 		defer close(rc)
 
-		// write request to remote
 		if err := ggio.NewDelimitedWriter(s).WriteMsg(req); ctx.Err() != nil {
 			return
 		} else if err != nil {
@@ -165,7 +161,6 @@ func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PersistentC
 			return
 		}
 
-		// await response from remote
 		remoteResp := &pb.PersistentConnectionRequest{}
 		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(remoteResp); ctx.Err() != nil {
 			return
@@ -174,13 +169,11 @@ func exchangeMessages(ctx context.Context, s network.Stream, req *pb.PersistentC
 			return
 		}
 
-		// convert response to a persistent channel response
 		resp := okUnaryCallResponse(callID)
 		resp.Message = &pb.PersistentConnectionResponse_CallUnaryResponse{
 			CallUnaryResponse: remoteResp.GetUnaryResponse(),
 		}
 
-		// avoid blocking rc channel on cancelled context
 		select {
 		case rc <- resp:
 			return
@@ -219,14 +212,13 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 	return func(s network.Stream) {
 		defer s.Close()
 
-		// read request from remote peer
 		req := &pb.PersistentConnectionRequest{}
 		if err := ggio.NewDelimitedReader(s, network.MessageSizeMax).ReadMsg(req); err != nil {
 			log.Debugw("failed to read proto from incoming p2p stream", "error", err)
 			return
 		}
 
-		// now the peer field points to the caller
+		// now the peer field stores the caller's peer id
 		req.GetCallUnary().Peer = []byte(s.Conn().RemotePeer())
 
 		callID, err := uuid.FromBytes(req.CallId)
@@ -235,7 +227,6 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 			return
 		}
 
-		// create response channel
 		rc := make(chan *pb.PersistentConnectionRequest)
 		d.responseWaiters.Store(callID, rc)
 		defer d.responseWaiters.Delete(callID)
@@ -243,10 +234,6 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 		ctx, cancel := context.WithCancel(d.ctx)
 		defer cancel()
 
-		// TODO: do we need to check for cancelled context
-		// before sending handling request to client?
-
-		// request handling from daemon's client
 		resp := &pb.PersistentConnectionResponse{
 			CallId: req.CallId,
 			Message: &pb.PersistentConnectionResponse_RequestHandling{
@@ -260,7 +247,6 @@ func (d *Daemon) getPersistentStreamHandler(cw ggio.Writer) network.StreamHandle
 
 		select {
 		case <-awaitReadFail(ctx, s):
-			// tell the client he got cancelled
 			if err := cw.WriteMsg(
 				&pb.PersistentConnectionResponse{
 					CallId: callID[:],
