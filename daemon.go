@@ -212,8 +212,7 @@ func (d *Daemon) Close() error {
 func (d *Daemon) awaitTermination() {
 	go func() {
 		d.terminateWG.Wait()
-		d.Close()
-		os.Exit(0)
+		go d.KillOnTimeout(10 * time.Second)
 	}()
 }
 
