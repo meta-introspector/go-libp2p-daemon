@@ -3,6 +3,7 @@ package p2pd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"os"
 	"sync"
@@ -48,6 +49,12 @@ type Daemon struct {
 	// callID (int64) to chan context.CancelFunc
 	// used to cancel request handlers
 	cancelUnary sync.Map
+
+	// this sync.Once ensures the goroutine awaiting deamon termination is
+	// only run once
+	terminateOnce   sync.Once
+	terminateWG     sync.WaitGroup
+	cancelTerminate context.CancelFunc
 }
 
 func NewDaemon(ctx context.Context, maddr ma.Multiaddr, dhtMode string, opts ...libp2p.Option) (*Daemon, error) {
@@ -200,4 +207,25 @@ func (d *Daemon) Close() error {
 	}
 
 	return merr.ErrorOrNil()
+}
+
+func (d *Daemon) awaitTermination() {
+	go func() {
+		d.terminateWG.Wait()
+		d.Close()
+		os.Exit(0)
+	}()
+}
+
+func (d *Daemon) KillOnTimeout(timeout time.Duration) {
+	ctx, cancel := context.WithCancel(d.ctx)
+	d.cancelTerminate = cancel
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.NewTimer(timeout).C:
+		d.Close()
+		os.Exit(0)
+	}
 }

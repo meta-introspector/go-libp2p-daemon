@@ -29,8 +29,16 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 		}
 	}()
 
-	w := &safeWriter{w: unsafeW}
+	if d.cancelTerminate != nil {
+		d.cancelTerminate()
+	}
 
+	d.terminateWG.Add(1)
+	defer d.terminateWG.Done()
+
+	d.terminateOnce.Do(d.awaitTermination)
+
+	w := &safeWriter{w: unsafeW}
 	for {
 		var req pb.PersistentConnectionRequest
 		if err := r.ReadMsg(&req); err != nil {
