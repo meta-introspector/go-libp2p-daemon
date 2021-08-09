@@ -79,37 +79,6 @@ func TestUnaryCalls(t *testing.T) {
 	)
 }
 
-func TestCancellation(t *testing.T) {
-	_, p1, cancel1 := createDaemonClientPair(t)
-	_, p2, cancel2 := createDaemonClientPair(t)
-
-	t.Cleanup(func() {
-		cancel1()
-		cancel2()
-	})
-
-	peer1ID, peer1Addrs, err := p1.Identify()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := p2.Connect(peer1ID, peer1Addrs); err != nil {
-		t.Fatal(err)
-	}
-
-	var proto protocol.ID = "sqrt"
-	if err := p1.AddUnaryHandler(proto, sqrtHandler); err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	_, err = p2.CallUnaryHandler(ctx, peer1ID, proto, []byte("hi"))
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
 func TestAddUnaryHandler(t *testing.T) {
 	// create a singe daemon and connect two client to it
 	dmaddr, c1maddr, dir1Closer := getEndpointsMaker(t)(t)
