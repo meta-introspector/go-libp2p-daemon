@@ -377,12 +377,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	done := make(chan struct{})
-	go func() {
-		d.Serve()
-		done <- struct{}{}
-	}()
-
 	if *idleTimeout > 0 {
 		go d.KillOnTimeout(*idleTimeout)
 	}
@@ -432,5 +426,5 @@ func main() {
 		go func() { log.Println(http.ListenAndServe(c.MetricsAddress, nil)) }()
 	}
 
-	<-done
+	d.Serve()
 }
