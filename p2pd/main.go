@@ -379,7 +379,7 @@ func main() {
 
 	done := make(chan struct{})
 	go func() {
-		d.ListenAndServe()
+		d.Serve()
 		done <- struct{}{}
 	}()
 

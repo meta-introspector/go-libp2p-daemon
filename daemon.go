@@ -150,7 +150,7 @@ func (d *Daemon) Addrs() []ma.Multiaddr {
 	return d.host.Addrs()
 }
 
-func (d *Daemon) ListenAndServe() error {
+func (d *Daemon) Serve() error {
 	for {
 		if d.isClosed() {
 			return nil
