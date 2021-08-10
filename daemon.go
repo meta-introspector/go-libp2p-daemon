@@ -88,7 +88,6 @@ func NewDaemon(ctx context.Context, maddr ma.Multiaddr, dhtMode string, opts ...
 	}
 	d.listener = l
 
-	go d.listen()
 	go d.trapSignals()
 
 	return d, nil
@@ -151,10 +150,10 @@ func (d *Daemon) Addrs() []ma.Multiaddr {
 	return d.host.Addrs()
 }
 
-func (d *Daemon) listen() {
+func (d *Daemon) ListenAndServe() error {
 	for {
 		if d.isClosed() {
-			return
+			return nil
 		}
 
 		c, err := d.listener.Accept()
@@ -212,7 +211,8 @@ func (d *Daemon) Close() error {
 func (d *Daemon) awaitTermination() {
 	go func() {
 		d.terminateWG.Wait()
-		go d.KillOnTimeout(10 * time.Second)
+		time.Sleep(time.Second * 30)
+		d.Close()
 	}()
 }
 
@@ -225,6 +225,5 @@ func (d *Daemon) KillOnTimeout(timeout time.Duration) {
 		return
 	case <-time.NewTimer(timeout).C:
 		d.Close()
-		os.Exit(0)
 	}
 }
