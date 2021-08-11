@@ -29,14 +29,14 @@ func (d *Daemon) handleUpgradedConn(r ggio.Reader, unsafeW ggio.Writer) {
 		}
 	}()
 
-	if d.cancelTerminate != nil {
-		d.cancelTerminate()
+	if d.cancelTerminateTimer != nil {
+		d.cancelTerminateTimer()
 	}
 
 	d.terminateWG.Add(1)
 	defer d.terminateWG.Done()
 
-	d.terminateOnce.Do(d.awaitTermination)
+	d.terminateOnce.Do(func() { go d.awaitTermination() })
 
 	w := &safeWriter{w: unsafeW}
 	for {

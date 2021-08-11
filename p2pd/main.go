@@ -378,7 +378,7 @@ func main() {
 	}
 
 	if *idleTimeout > 0 {
-		go d.KillOnTimeout(*idleTimeout)
+		d.KillOnTimeout(*idleTimeout)
 	}
 
 	if c.PubSub.Enabled {
@@ -426,5 +426,7 @@ func main() {
 		go func() { log.Println(http.ListenAndServe(c.MetricsAddress, nil)) }()
 	}
 
-	d.Serve()
+	if err := d.Serve(); err != nil {
+		log.Fatal(err)
+	}
 }

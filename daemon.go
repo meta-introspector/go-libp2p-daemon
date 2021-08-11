@@ -52,9 +52,9 @@ type Daemon struct {
 
 	// this sync.Once ensures the goroutine awaiting deamon termination is
 	// only run once
-	terminateOnce   sync.Once
-	terminateWG     sync.WaitGroup
-	cancelTerminate context.CancelFunc
+	terminateOnce        sync.Once
+	terminateWG          sync.WaitGroup
+	cancelTerminateTimer context.CancelFunc
 }
 
 func NewDaemon(ctx context.Context, maddr ma.Multiaddr, dhtMode string, opts ...libp2p.Option) (*Daemon, error) {
@@ -209,21 +209,20 @@ func (d *Daemon) Close() error {
 }
 
 func (d *Daemon) awaitTermination() {
-	go func() {
-		d.terminateWG.Wait()
-		time.Sleep(time.Second * 30)
-		d.Close()
-	}()
+	d.terminateWG.Wait()
+	d.Close()
 }
 
 func (d *Daemon) KillOnTimeout(timeout time.Duration) {
-	ctx, cancel := context.WithCancel(d.ctx)
-	d.cancelTerminate = cancel
+	go func() {
+		ctx, cancel := context.WithCancel(d.ctx)
+		d.cancelTerminateTimer = cancel
 
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.NewTimer(timeout).C:
-		d.Close()
-	}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.NewTimer(timeout).C:
+			d.Close()
+		}
+	}()
 }
