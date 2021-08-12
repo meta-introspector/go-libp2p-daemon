@@ -2,14 +2,14 @@ on: [push]
 name: Go Test
 
 jobs:
-  unit:
+  go_test:
     strategy:
       fail-fast: false
       matrix:
         os: [ "ubuntu", "windows", "macos" ]
         go: [ "1.15.x", "1.16.x" ]
     runs-on: ${{ matrix.os }}-latest
-    name: ${{ matrix.os}} (go ${{ matrix.go }})
+    name: ${{ matrix.os }}, go ${{ matrix.go }}
     steps:
       - uses: actions/checkout@v2
         with:

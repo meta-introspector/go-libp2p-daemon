@@ -2,9 +2,8 @@ on: [push]
 name: Go Checks
 
 jobs:
-  unit:
+  go_checks:
     runs-on: ubuntu-latest
-    name: All
     steps:
       - uses: actions/checkout@v2
         with:
