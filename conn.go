@@ -184,7 +184,8 @@ func (d *Daemon) doConnect(req *pb.Request) *pb.Response {
 		return errorResponse(err)
 	}
 
-	addrs := make([]ma.Multiaddr, len(req.Connect.Addrs))
+	var addrs []ma.Multiaddr
+	addrs = make([]ma.Multiaddr, len(req.Connect.Addrs))
 	for x, bs := range req.Connect.Addrs {
 		addr, err := ma.NewMultiaddrBytes(bs)
 		if err != nil {

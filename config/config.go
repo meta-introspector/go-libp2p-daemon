@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -81,6 +82,7 @@ type PProf struct {
 }
 
 type Security struct {
+	SECIO bool
 	Noise bool
 	TLS   bool
 }
@@ -129,10 +131,10 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 
 func (c *Config) Validate() error {
 	if c.DHT.Mode != DHTClientMode && c.DHT.Mode != DHTFullMode && c.DHT.Mode != DHTServerMode && c.DHT.Mode != "" {
-		return fmt.Errorf("unknown DHT mode %s", c.DHT)
+		return errors.New(fmt.Sprintf("unknown DHT mode %s", c.DHT))
 	}
-	if c.Relay.Auto && (!c.Relay.Enabled || c.DHT.Mode == "") {
-		return fmt.Errorf("can't have autorelay enabled without Relay enabled and DHT enabled")
+	if c.Relay.Auto == true && (c.Relay.Enabled == false || c.DHT.Mode == "") {
+		return errors.New("can't have autorelay enabled without Relay enabled and DHT enabled")
 	}
 	return nil
 }
@@ -185,6 +187,7 @@ func NewDefaultConfig() Config {
 			Port:    0,
 		},
 		Security: Security{
+			SECIO: false,
 			Noise: true,
 			TLS:   true,
 		},

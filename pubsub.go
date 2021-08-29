@@ -56,7 +56,6 @@ func (d *Daemon) doPubsubPublish(req *pb.PSRequest) (*pb.Response, *ps.Subscript
 		return errorResponseString("Malformed request; missing topic parameter"), nil
 	}
 
-	//lint:ignore SA1019 requires API changes
 	err := d.pubsub.Publish(*req.Topic, req.Data)
 	if err != nil {
 		return errorResponse(err), nil
@@ -70,7 +69,6 @@ func (d *Daemon) doPubsubSubscribe(req *pb.PSRequest) (*pb.Response, *ps.Subscri
 		return errorResponseString("Malformed request; missing topic parameter"), nil
 	}
 
-	//lint:ignore SA1019 requires API changes
 	sub, err := d.pubsub.Subscribe(*req.Topic)
 	if err != nil {
 		return errorResponse(err), nil
@@ -130,7 +128,7 @@ func psMessage(msg *ps.Message) *pb.PSMessage {
 		From:      msg.From,
 		Data:      msg.Data,
 		Seqno:     msg.Seqno,
-		TopicIDs:  []string{*msg.Topic},
+		TopicIDs:  msg.TopicIDs,
 		Signature: msg.Signature,
 		Key:       msg.Key,
 	}
