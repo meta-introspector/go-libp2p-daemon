@@ -2,25 +2,32 @@ package p2pd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
 var BootstrapPeers = dht.DefaultBootstrapPeers
 
 const BootstrapConnections = 4
 
-func bootstrapPeerInfo() ([]peer.AddrInfo, error) {
-	return peer.AddrInfosFromP2pAddrs(BootstrapPeers...)
+func bootstrapPeerInfo() ([]*pstore.PeerInfo, error) {
+	pis := make([]*pstore.PeerInfo, 0, len(BootstrapPeers))
+	for _, a := range BootstrapPeers {
+		pi, err := pstore.InfoFromP2pAddr(a)
+		if err != nil {
+			return nil, err
+		}
+		pis = append(pis, pi)
+	}
+	return pis, nil
 }
 
-func shufflePeerInfos(peers []peer.AddrInfo) {
+func shufflePeerInfos(peers []*pstore.PeerInfo) {
 	for i := range peers {
 		j := rand.Intn(i + 1)
 		peers[i], peers[j] = peers[j], peers[i]
@@ -34,12 +41,12 @@ func (d *Daemon) Bootstrap() error {
 	}
 
 	for _, pi := range pis {
-		d.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
+		d.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, pstore.PermanentAddrTTL)
 	}
 
 	count := d.connectBootstrapPeers(pis, BootstrapConnections)
 	if count == 0 {
-		return fmt.Errorf("failed to connect to bootstrap peers")
+		return errors.New("Failed to connect to bootstrap peers")
 	}
 
 	go d.keepBootstrapConnections(pis)
@@ -51,7 +58,7 @@ func (d *Daemon) Bootstrap() error {
 	return nil
 }
 
-func (d *Daemon) connectBootstrapPeers(pis []peer.AddrInfo, toconnect int) int {
+func (d *Daemon) connectBootstrapPeers(pis []*pstore.PeerInfo, toconnect int) int {
 	count := 0
 
 	shufflePeerInfos(pis)
@@ -63,7 +70,7 @@ func (d *Daemon) connectBootstrapPeers(pis []peer.AddrInfo, toconnect int) int {
 		if d.host.Network().Connectedness(pi.ID) == network.Connected {
 			continue
 		}
-		err := d.host.Connect(ctx, pi)
+		err := d.host.Connect(ctx, *pi)
 		if err != nil {
 			log.Debugw("Error connecting to bootstrap peer", "peer", pi.ID, "error", err)
 		} else {
@@ -80,7 +87,7 @@ func (d *Daemon) connectBootstrapPeers(pis []peer.AddrInfo, toconnect int) int {
 
 }
 
-func (d *Daemon) keepBootstrapConnections(pis []peer.AddrInfo) {
+func (d *Daemon) keepBootstrapConnections(pis []*pstore.PeerInfo) {
 	ticker := time.NewTicker(15 * time.Minute)
 	for {
 		<-ticker.C
