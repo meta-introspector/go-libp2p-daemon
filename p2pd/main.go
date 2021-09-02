@@ -107,7 +107,7 @@ func main() {
 		"Kills the daemon if no client opens a persistent connection in idleTimeout seconds."+
 			" The zero value (default) disables this feature")
 	persistentConnMaxMsgSize := flag.Int("persistentConnMaxMsgSize", 1<<22,
-		"Max size for persistent connection messages (bytes)")
+		"Max size for persistent connection messages (bytes). Default: 4 MiB")
 
 	flag.Parse()
 
