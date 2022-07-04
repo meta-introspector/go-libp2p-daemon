@@ -8,6 +8,8 @@ require (
 	github.com/containerd/cgroups v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/go-yaml/yaml v2.1.0+incompatible // indirect
+	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/uuid v1.3.0
@@ -32,9 +34,11 @@ require (
 	github.com/multiformats/go-multicodec v0.4.0 // indirect
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/polydawn/refmt v0.0.0-20201211092308-30ac6d18308e // indirect
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/stretchr/testify v1.7.0
+	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -399,7 +400,16 @@ func main() {
 		go func() { log.Println(http.ListenAndServe(c.MetricsAddress, nil)) }()
 	}
 
-	if err := d.Serve(); err != nil {
-		log.Fatal(err)
-	}
+	// Wrap to goroutine 
+        go func() {
+	     if err := d.Serve(); err != nil {
+		   log.Fatal(err)
+	     }
+        }()
+
+	// Ignore SIGINT 
+	ccc := make(chan os.Signal)
+        signal.Notify(ccc, os.Interrupt)
+        signal.Ignore(os.Interrupt)
+	<-ccc
 }
