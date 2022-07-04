@@ -400,16 +400,9 @@ func main() {
 		go func() { log.Println(http.ListenAndServe(c.MetricsAddress, nil)) }()
 	}
 
-	// Wrap to goroutine 
-        go func() {
-	     if err := d.Serve(); err != nil {
-		   log.Fatal(err)
-	     }
-        }()
+	signal.Ignore(os.Interrupt)
 
-	// Ignore SIGINT 
-	ccc := make(chan os.Signal)
-        signal.Notify(ccc, os.Interrupt)
-        signal.Ignore(os.Interrupt)
-	<-ccc
+	if err := d.Serve(); err != nil {
+		log.Fatal(err)
+	}
 }
