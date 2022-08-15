@@ -163,14 +163,13 @@ func (d *Daemon) doRemoveUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.R
 			callID,
 			fmt.Sprintf("handler for protocol %s does not exist", *req.Proto),
 		)
-	} else {
-		round_robin.Remove(w)
-		if round_robin.Len() == 0 {
-			d.host.RemoveStreamHandler(p)
-			delete(d.registeredUnaryProtocols, p)
-		}
 	}
 
+	round_robin.Remove(w)
+	if round_robin.Len() == 0 {
+		d.host.RemoveStreamHandler(p)
+		delete(d.registeredUnaryProtocols, p)
+	}
 	return okUnaryCallResponse(callID)
 }
 
