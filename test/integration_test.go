@@ -84,7 +84,7 @@ func TestStreams(t *testing.T) {
 	err = c1.NewStreamHandler(testprotos, makeExpectStringHandler(t, done), false)
 	require.NoError(t, err)
 
-	err = callExpectStringHandler(t, c2, d1.ID(), testprotos, done)
+	err = callExpectStringHandler(c2, d1.ID(), testprotos, done)
 	require.NoError(t, err)
 }
 
@@ -113,17 +113,17 @@ func TestRemovingStreams(t *testing.T) {
 	require.NoError(t, err)
 	err = c2.NewStreamHandler(testprotos, makeExpectStringHandler(t, done), true)
 	require.NoError(t, err)
-	err = callExpectStringHandler(t, c3, peer1ID, testprotos, done)
+	err = callExpectStringHandler(c3, peer1ID, testprotos, done)
 	require.NoError(t, err)
 
 	err = c1.RemoveStreamHandler(testprotos)
 	require.NoError(t, err)
-	err = callExpectStringHandler(t, c3, peer1ID, testprotos, done)
+	err = callExpectStringHandler(c3, peer1ID, testprotos, done)
 	require.NoError(t, err, "The handler was removed only on the 1st client, the 2nd client should respond")
 
 	err = c2.RemoveStreamHandler(testprotos)
 	require.NoError(t, err)
-	err = callExpectStringHandler(t, c3, peer1ID, testprotos, done)
+	err = callExpectStringHandler(c3, peer1ID, testprotos, done)
 	require.Error(t, err, "Calling a handler removed on all clients should return an error")
 }
 
@@ -145,7 +145,7 @@ func makeExpectStringHandler(t *testing.T, done chan struct{}) p2pclient.StreamH
 	}
 }
 
-func callExpectStringHandler(t *testing.T, client *p2pclient.Client, peerID peer.ID, testprotos []string, done chan struct{}) error {
+func callExpectStringHandler(client *p2pclient.Client, peerID peer.ID, testprotos []string, done chan struct{}) error {
 	_, conn, err := client.NewStream(peerID, testprotos)
 	if err != nil {
 		return err
