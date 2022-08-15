@@ -80,7 +80,26 @@ func (d *Daemon) handlePersistentConnRequest(req pb.PersistentConnectionRequest,
 		d.mx.Unlock()
 
 		if err := w.WriteMsg(resp); err != nil {
-			log.Debugw("error reading message", "error", err)
+			log.Debugw("error writing message", "error", err)
+			return
+		}
+
+	case *pb.PersistentConnectionRequest_RemoveUnaryHandler:
+		resp := d.doRemoveUnaryHandler(w, callID, req.GetRemoveUnaryHandler())
+
+		d.mx.Lock()
+		if _, ok := resp.Message.(*pb.PersistentConnectionResponse_DaemonError); !ok {
+			for index, proto := range *streamHandlers {
+				if proto == *req.GetRemoveUnaryHandler().Proto {
+					*streamHandlers = append((*streamHandlers)[:index], (*streamHandlers)[index + 1:]...)
+					break
+				}
+			}
+		}
+		d.mx.Unlock()
+
+		if err := w.WriteMsg(resp); err != nil {
+			log.Debugw("error writing message", "error", err)
 			return
 		}
 
@@ -116,7 +135,7 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 	defer d.mx.Unlock()
 
 	p := protocol.ID(*req.Proto)
-	_, ok := d.registeredUnaryProtocols[p]
+	round_robin, ok := d.registeredUnaryProtocols[p]
 	if !ok {
 		d.registeredUnaryProtocols[p] = utils.NewRoundRobin()
 		d.registeredUnaryProtocols[p].Append(w)
@@ -127,10 +146,30 @@ func (d *Daemon) doAddUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.AddU
 			fmt.Sprintf("handler for protocol %s already set", *req.Proto),
 		)
 	} else {
-		d.registeredUnaryProtocols[p].Append(w)
+		round_robin.Append(w)
 	}
 
-	log.Debugw("set unary stream handler", "protocol", p)
+	return okUnaryCallResponse(callID)
+}
+
+func (d *Daemon) doRemoveUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.RemoveUnaryHandlerRequest) *pb.PersistentConnectionResponse {
+	d.mx.Lock()
+	defer d.mx.Unlock()
+
+	p := protocol.ID(*req.Proto)
+	round_robin, ok := d.registeredUnaryProtocols[p]
+	if !ok {
+		return errorUnaryCallString(
+			callID,
+			fmt.Sprintf("handler for protocol %s does not exist", *req.Proto),
+		)
+	} else {
+		round_robin.Remove(w)
+		if round_robin.Len() == 0 {
+			d.host.RemoveStreamHandler(p)
+			delete(d.registeredUnaryProtocols, p)
+		}
+	}
 
 	return okUnaryCallResponse(callID)
 }

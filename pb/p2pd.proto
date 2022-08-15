@@ -48,6 +48,7 @@ message PersistentConnectionRequest {
 
   oneof message {
     AddUnaryHandlerRequest addUnaryHandler = 2;
+    RemoveUnaryHandlerRequest removeUnaryHandler = 6;
     CallUnaryRequest  callUnary = 3;
     CallUnaryResponse unaryResponse = 4;
     Cancel cancel = 5;
@@ -199,6 +200,10 @@ message CallUnaryResponse {
 message AddUnaryHandlerRequest {
   required string proto = 1;
   required bool balanced = 2;
+}
+
+message RemoveUnaryHandlerRequest {
+  required string proto = 1;
 }
 
 message DaemonError {
