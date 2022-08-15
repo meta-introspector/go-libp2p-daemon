@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-daemon/p2pclient"
 )
@@ -255,6 +258,44 @@ func TestBalancedCall(t *testing.T) {
 	if control != 0 {
 		t.Fatalf("daemon did not balanced handlers %d", control)
 	}
+}
+
+func TestRemoveUnaryHandler(t *testing.T) {
+	d1, c1, cancel1 := createDaemonClientPair(t)
+	c2maddr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
+	require.NoError(t, err)
+	c2, cancel2 := createClient(t, d1.Listener().Multiaddr(), c2maddr)
+
+	_, c3, cancel3 := createDaemonClientPair(t)
+
+	defer func() {
+		cancel1()
+		cancel2()
+		cancel3()
+	}()
+
+	peer1ID, peer1Addrs, err := c1.Identify()
+	require.NoError(t, err)
+	err = c3.Connect(peer1ID, peer1Addrs)
+	require.NoError(t, err)
+
+	var proto protocol.ID = "sqrt"
+	err = c1.AddUnaryHandler(proto, sqrtHandler, true)
+	require.NoError(t, err)
+	err = c2.AddUnaryHandler(proto, sqrtHandler, true)
+	require.NoError(t, err)
+	_, err = c3.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(4))
+	require.NoError(t, err)
+
+	err = c1.RemoveUnaryHandler(proto)
+	require.NoError(t, err)
+	_, err = c3.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(4))
+	require.NoError(t, err, "The handler was removed only on the 2nd client, the 1st client should respond")
+
+	err = c2.RemoveUnaryHandler(proto)
+	require.NoError(t, err)
+	_, err = c3.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(4))
+	require.Error(t, err, "Calling a handler removed on all clients should return an error")
 }
 
 func float64FromBytes(bytes []byte) float64 {
