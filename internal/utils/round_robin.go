@@ -11,8 +11,29 @@ func (r *RoundRobin) Next() interface{} {
 	return v
 }
 
-func (r *RoundRobin) Push(v interface{}) {
+func (r *RoundRobin) Append(v interface{}) {
 	r.data = append(r.data, v)
+}
+
+func (r *RoundRobin) Remove(v interface{}) {
+	found := -1
+	for index, item := range r.data {
+		if item == v {
+			found = index
+			break
+		}
+	}
+
+	if found != -1 {
+		r.data = append(r.data[:found], r.data[found + 1:]...)
+
+		if found < r.next {
+			r.next--
+		}
+		if r.next == r.Len() {
+			r.next = 0
+		}
+	}
 }
 
 func (r *RoundRobin) Len() int {
