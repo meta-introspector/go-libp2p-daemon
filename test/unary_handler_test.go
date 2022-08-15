@@ -188,10 +188,6 @@ func TestAddUnaryHandler(t *testing.T) {
 		t.Fatal("adding second unary handler with same name should have returned error")
 	}
 
-	if err := c2.AddUnaryHandler(proto, sqrtHandler, true); err != nil {
-		t.Fatal("adding secondary BALANCED unary handler with same name returned error")
-	}
-
 	if err := c1.Close(); err != nil {
 		t.Fatal("closing client 1 should not have returned an error", err)
 	}
