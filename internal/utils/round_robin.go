@@ -25,7 +25,7 @@ func (r *RoundRobin) Remove(v interface{}) {
 	}
 
 	if found != -1 {
-		r.data = append(r.data[:found], r.data[found + 1:]...)
+		r.data = append(r.data[:found], r.data[found+1:]...)
 
 		if found < r.next {
 			r.next--

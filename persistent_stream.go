@@ -91,7 +91,7 @@ func (d *Daemon) handlePersistentConnRequest(req pb.PersistentConnectionRequest,
 		if _, ok := resp.Message.(*pb.PersistentConnectionResponse_DaemonError); !ok {
 			for index, proto := range *streamHandlers {
 				if proto == *req.GetRemoveUnaryHandler().Proto {
-					*streamHandlers = append((*streamHandlers)[:index], (*streamHandlers)[index + 1:]...)
+					*streamHandlers = append((*streamHandlers)[:index], (*streamHandlers)[index+1:]...)
 					break
 				}
 			}

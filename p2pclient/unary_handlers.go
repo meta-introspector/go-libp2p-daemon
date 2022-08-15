@@ -163,7 +163,7 @@ func (c *Client) RemoveUnaryHandler(proto protocol.ID) error {
 			CallId: callID[:],
 			Message: &pb.PersistentConnectionRequest_RemoveUnaryHandler{
 				RemoveUnaryHandler: &pb.RemoveUnaryHandlerRequest{
-					Proto:    (*string)(&proto),
+					Proto: (*string)(&proto),
 				},
 			},
 		},

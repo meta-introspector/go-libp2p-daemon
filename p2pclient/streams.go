@@ -236,8 +236,8 @@ func (c *Client) RemoveStreamHandler(protos []string) error {
 	req := &pb.Request{
 		Type: pb.Request_REMOVE_STREAM_HANDLER.Enum(),
 		RemoveStreamHandler: &pb.RemoveStreamHandlerRequest{
-			Addr:     c.listenMaddr.Bytes(),
-			Proto:    protos,
+			Addr:  c.listenMaddr.Bytes(),
+			Proto: protos,
 		},
 	}
 	if err := w.WriteMsg(req); err != nil {
