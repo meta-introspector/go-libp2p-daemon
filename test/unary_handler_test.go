@@ -12,9 +12,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-daemon/p2pclient"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 func TestConcurrentCalls(t *testing.T) {
@@ -226,7 +226,7 @@ func TestRemoveUnaryHandler(t *testing.T) {
 	err = c1.RemoveUnaryHandler(proto)
 	require.NoError(t, err)
 	_, err = c3.CallUnaryHandler(context.Background(), peer1ID, proto, float64Bytes(4))
-	require.NoError(t, err, "The handler was removed only on the 2nd client, the 1st client should respond")
+	require.NoError(t, err, "The handler was removed only on the 1st client, the 2nd client should respond")
 
 	err = c2.RemoveUnaryHandler(proto)
 	require.NoError(t, err)

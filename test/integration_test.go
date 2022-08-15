@@ -119,7 +119,7 @@ func TestRemovingStreams(t *testing.T) {
 	err = c1.RemoveStreamHandler(testprotos)
 	require.NoError(t, err)
 	err = callExpectStringHandler(t, c3, peer1ID, testprotos, done)
-	require.NoError(t, err, "The handler was removed only on the 2nd client, the 1st client should respond")
+	require.NoError(t, err, "The handler was removed only on the 1st client, the 2nd client should respond")
 
 	err = c2.RemoveStreamHandler(testprotos)
 	require.NoError(t, err)
