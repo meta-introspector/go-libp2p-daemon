@@ -1,5 +1,9 @@
 package utils
 
+import (
+	"reflect"
+)
+
 type RoundRobin struct {
 	data []interface{}
 	next int
@@ -18,7 +22,7 @@ func (r *RoundRobin) Append(v interface{}) {
 func (r *RoundRobin) Remove(v interface{}) {
 	found := -1
 	for index, item := range r.data {
-		if item == v {
+		if reflect.DeepEqual(item, v) {
 			found = index
 			break
 		}
