@@ -165,7 +165,13 @@ func (d *Daemon) doRemoveUnaryHandler(w ggio.Writer, callID uuid.UUID, req *pb.R
 		)
 	}
 
-	round_robin.Remove(w)
+	ok = round_robin.Remove(w)
+	if !ok {
+		return errorUnaryCallString(
+			callID,
+			fmt.Sprintf("handler for protocol %s was not created in this persistent connection", *req.Proto),
+		)
+	}
 	if round_robin.Len() == 0 {
 		d.host.RemoveStreamHandler(p)
 		delete(d.registeredUnaryProtocols, p)

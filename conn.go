@@ -314,7 +314,10 @@ func (d *Daemon) doRemoveStreamHandler(req *pb.Request) *pb.Response {
 			return errorResponseString(fmt.Sprintf("handler for protocol %s does not exist", p))
 		}
 
-		round_robin.Remove(maddr)
+		ok = round_robin.Remove(maddr)
+		if !ok {
+			return errorResponseString(fmt.Sprintf("handler for protocol %s with maddr %s does not exist", p, maddr.String()))
+		}
 		if round_robin.Len() == 0 {
 			d.host.RemoveStreamHandler(p)
 			delete(d.handlers, p)

@@ -19,7 +19,7 @@ func (r *RoundRobin) Append(v interface{}) {
 	r.data = append(r.data, v)
 }
 
-func (r *RoundRobin) Remove(v interface{}) {
+func (r *RoundRobin) Remove(v interface{}) bool {
 	found := -1
 	for index, item := range r.data {
 		if reflect.DeepEqual(item, v) {
@@ -27,17 +27,18 @@ func (r *RoundRobin) Remove(v interface{}) {
 			break
 		}
 	}
-
-	if found != -1 {
-		r.data = append(r.data[:found], r.data[found+1:]...)
-
-		if found < r.next {
-			r.next--
-		}
-		if r.next == r.Len() {
-			r.next = 0
-		}
+	if found == -1 {
+		return false
 	}
+
+	r.data = append(r.data[:found], r.data[found+1:]...)
+	if found < r.next {
+		r.next--
+	}
+	if r.next == r.Len() {
+		r.next = 0
+	}
+	return true
 }
 
 func (r *RoundRobin) Len() int {
