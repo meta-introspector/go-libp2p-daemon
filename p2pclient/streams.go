@@ -224,10 +224,12 @@ func (c *Client) NewStreamHandler(protos []string, handler StreamHandlerFunc, ba
 }
 
 func (c *Client) RemoveStreamHandler(protos []string) error {
-	control, err := c.newControlConn()
+	raw_control, err := c.newControlConn()
 	if err != nil {
 		return err
 	}
+	control := &byteReaderConn{raw_control}
+	defer control.Close()
 
 	c.mhandlers.Lock()
 	defer c.mhandlers.Unlock()
@@ -242,6 +244,15 @@ func (c *Client) RemoveStreamHandler(protos []string) error {
 	}
 	if err := w.WriteMsg(req); err != nil {
 		return err
+	}
+
+	resp := &pb.Response{}
+	err = readMsgSafe(control, resp)
+	if err != nil {
+		return err
+	}
+	if err := resp.GetError(); err != nil {
+		return fmt.Errorf("error from daemon: %s", err.GetMsg())
 	}
 
 	for _, proto := range protos {
