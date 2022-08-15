@@ -303,11 +303,11 @@ func (d *Daemon) doRemoveStreamHandler(req *pb.Request) *pb.Response {
 	d.mx.Lock()
 	defer d.mx.Unlock()
 
-	maddr, err := ma.NewMultiaddrBytes(req.StreamHandler.Addr)
+	maddr, err := ma.NewMultiaddrBytes(req.RemoveStreamHandler.Addr)
 	if err != nil {
 		return errorResponse(err)
 	}
-	for _, sp := range req.StreamHandler.Proto {
+	for _, sp := range req.RemoveStreamHandler.Proto {
 		p := protocol.ID(sp)
 		round_robin, ok := d.handlers[p]
 		if !ok {
