@@ -16,13 +16,13 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 
-	relay "github.com/libp2p/go-libp2p-circuit"
-	connmgr "github.com/libp2p/go-libp2p-connmgr"
+	// relay "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	p2pd "github.com/libp2p/go-libp2p-daemon"
 	config "github.com/libp2p/go-libp2p-daemon/config"
-	noise "github.com/libp2p/go-libp2p-noise"
 	ps "github.com/libp2p/go-libp2p-pubsub"
-	tls "github.com/libp2p/go-libp2p-tls"
+	connmgr "github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
+	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	multiaddr "github.com/multiformats/go-multiaddr"
 	promhttp "github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -315,9 +315,9 @@ func main() {
 			opts = append(opts, libp2p.EnableAutoRelay())
 		}
 
-		if c.Relay.HopLimit > 0 {
-			relay.HopStreamLimit = c.Relay.HopLimit
-		}
+		// if c.Relay.HopLimit > 0 {
+		// relay.HopStreamLimit = c.Relay.HopLimit
+		// }
 	}
 
 	if c.NoListen {
