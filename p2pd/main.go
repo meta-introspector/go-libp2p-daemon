@@ -84,7 +84,7 @@ func main() {
 	relayEnabled := flag.Bool("relay", true, "Enables circuit relay")
 	flag.Bool("relayActive", false, "Enables active mode for relay (deprecated, has no effect)")
 	flag.Bool("relayHop", false, "Enables hop for relay (deprecated, has no effect)")
-	relayHopLimit := flag.Int("relayHopLimit", 0, "DEPRICATED FEATURE, HAS NO EFFECT. Sets the hop limit for hop relays")
+	relayHopLimit := flag.Int("relayHopLimit", 0, "Sets the hop limit for hop relays (deprecated, has no effect)")
 	flag.Bool("relayDiscovery", false, "Enables passive discovery for relay (deprecated, has no effect)")
 	autoRelay := flag.Bool("autoRelay", false, "Enables autorelay")
 	autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
