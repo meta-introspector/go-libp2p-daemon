@@ -65,10 +65,10 @@ type Daemon struct {
 
 func NewResourceManager() (network.ResourceManager) {
     // setup resource usage limits; see https://github.com/libp2p/go-libp2p/tree/master/p2p/host/resource-manager
-    scalingLimits := rcmgr.DefaultLimits
-    libp2p.SetDefaultServiceLimits(&scalingLimits)
-    limits := scalingLimits.AutoScale()
-    limiter := rcmgr.NewFixedLimiter(limits)
+//     scalingLimits := rcmgr.InfiniteLimits
+    //libp2p.SetDefaultServiceLimits(&scalingLimits)
+//     limits := scalingLimits.AutoScale()
+    limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
     rm, err := rcmgr.NewResourceManager(limiter)
     if err != nil {
       panic(err)
