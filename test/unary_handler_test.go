@@ -63,7 +63,6 @@ func TestConcurrentCalls(t *testing.T) {
 				panic(err)
 			}
 		}(i)
-		time.Sleep(time.Second / 10)
 	}
 
 	wg.Wait()
