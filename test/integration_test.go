@@ -220,6 +220,8 @@ func TestBalancedStreams(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	time.Sleep(time.Second)
+
 	control := 0
 	for i := 0; i < 10; i++ {
 		_, conn, err := callerClient.NewStream(handlerDaemon.ID(), testprotos)
