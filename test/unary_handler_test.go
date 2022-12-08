@@ -11,13 +11,18 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
+    logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-daemon/p2pclient"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
 func TestConcurrentCalls(t *testing.T) {
+    lvl, err := logging.LevelFromString("debug")
+    if err != nil {
+        panic(err)
+    }
+    logging.SetAllLoggers(lvl)
 	_, p1, cancel1 := createDaemonClientPair(t)
 	_, p2, cancel2 := createDaemonClientPair(t)
 
