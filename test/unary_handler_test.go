@@ -188,6 +188,7 @@ func TestAddUnaryHandler(t *testing.T) {
 
 	err = c1.Close()
 	require.NoError(t, err)
+	time.Sleep(50 * time.Millisecond)
 
 	err = c2.AddUnaryHandler(proto, sqrtHandler, false)
 	require.NoError(t, err, "closing client 1 should have cleaned up the proto list")
