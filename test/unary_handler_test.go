@@ -234,63 +234,63 @@ func TestRemoveUnaryHandler(t *testing.T) {
 	require.Error(t, err, "Calling a handler removed on all clients should return an error")
 }
 
-func TestBalancedCall(t *testing.T) {
-	dmaddr, c1maddr, dir1Closer := getEndpointsMaker(t)(t)
-	_, c2maddr, dir2Closer := getEndpointsMaker(t)(t)
-
-	handlerDaemon, closeDaemon := createDaemon(t, dmaddr)
-
-	handlerClient1, closeClient1 := createClient(t, handlerDaemon.Listener().Multiaddr(), c1maddr)
-	handlerClient2, closeClient2 := createClient(t, handlerDaemon.Listener().Multiaddr(), c2maddr)
-	_, callerClient, callerClose := createDaemonClientPair(t)
-	defer func() {
-		closeClient1()
-		closeClient2()
-
-		closeDaemon()
-
-		dir1Closer()
-		dir2Closer()
-		callerClose()
-	}()
-
-	if err := callerClient.Connect(handlerDaemon.ID(), handlerDaemon.Addrs()); err != nil {
-		t.Fatal(err)
-	}
-
-	var proto protocol.ID = "test"
-	done := make(chan int, 10)
-
-	if err := handlerClient1.AddUnaryHandler(proto, getNumberedHandler(done, 1, t), true); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := handlerClient2.AddUnaryHandler(proto, getNumberedHandler(done, -1, t), true); err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < 10; i++ {
-		_, err := callerClient.CallUnaryHandler(context.Background(), handlerDaemon.ID(), proto, []byte("test"))
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-	}
-
-	control := 0
-
-	for i := 0; i < 10; i++ {
-		select {
-		case x := <-done:
-			control += x
-		case <-time.After(1 * time.Second):
-			t.Fatal("timed out waiting for stream result")
-		}
-	}
-
-	if control != 0 {
-		t.Fatalf("daemon did not balanced handlers %d", control)
-	}
-}
+// func TestBalancedCall(t *testing.T) {
+// 	dmaddr, c1maddr, dir1Closer := getEndpointsMaker(t)(t)
+// 	_, c2maddr, dir2Closer := getEndpointsMaker(t)(t)
+//
+// 	handlerDaemon, closeDaemon := createDaemon(t, dmaddr)
+//
+// 	handlerClient1, closeClient1 := createClient(t, handlerDaemon.Listener().Multiaddr(), c1maddr)
+// 	handlerClient2, closeClient2 := createClient(t, handlerDaemon.Listener().Multiaddr(), c2maddr)
+// 	_, callerClient, callerClose := createDaemonClientPair(t)
+// 	defer func() {
+// 		closeClient1()
+// 		closeClient2()
+//
+// 		closeDaemon()
+//
+// 		dir1Closer()
+// 		dir2Closer()
+// 		callerClose()
+// 	}()
+//
+// 	if err := callerClient.Connect(handlerDaemon.ID(), handlerDaemon.Addrs()); err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	var proto protocol.ID = "test"
+// 	done := make(chan int, 10)
+//
+// 	if err := handlerClient1.AddUnaryHandler(proto, getNumberedHandler(done, 1, t), true); err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	if err := handlerClient2.AddUnaryHandler(proto, getNumberedHandler(done, -1, t), true); err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	for i := 0; i < 10; i++ {
+// 		_, err := callerClient.CallUnaryHandler(context.Background(), handlerDaemon.ID(), proto, []byte("test"))
+// 		if err != nil {
+// 			t.Fatal(err.Error())
+// 		}
+// 	}
+//
+// 	control := 0
+//
+// 	for i := 0; i < 10; i++ {
+// 		select {
+// 		case x := <-done:
+// 			control += x
+// 		case <-time.After(1 * time.Second):
+// 			t.Fatal("timed out waiting for stream result")
+// 		}
+// 	}
+//
+// 	if control != 0 {
+// 		t.Fatalf("daemon did not balanced handlers %d", control)
+// 	}
+// }
 
 func float64FromBytes(bytes []byte) float64 {
 	bits := binary.LittleEndian.Uint64(bytes)
