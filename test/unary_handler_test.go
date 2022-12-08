@@ -19,7 +19,6 @@ import (
 func TestConcurrentCalls(t *testing.T) {
 	_, p1, cancel1 := createDaemonClientPair(t)
 	_, p2, cancel2 := createDaemonClientPair(t)
-	time.Sleep(100 * time.Millisecond) // not sure this is useful
 
 	defer func() {
 		cancel1()
@@ -189,8 +188,6 @@ func TestAddUnaryHandler(t *testing.T) {
 
 	err = c1.Close()
 	require.NoError(t, err)
-
-	time.Sleep(time.Second) // not sure about this
 
 	err = c2.AddUnaryHandler(proto, sqrtHandler, false)
 	require.NoError(t, err, "closing client 1 should have cleaned up the proto list")
