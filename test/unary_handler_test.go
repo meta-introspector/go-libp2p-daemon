@@ -25,6 +25,7 @@ func TestConcurrentCalls(t *testing.T) {
     logging.SetAllLoggers(lvl)
 	_, p1, cancel1 := createDaemonClientPair(t)
 	_, p2, cancel2 := createDaemonClientPair(t)
+	time.Sleep(100 * time.Millisecond) // not sure this is useful
 
 	defer func() {
 		cancel1()
