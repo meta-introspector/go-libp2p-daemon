@@ -5,8 +5,8 @@ import (
 )
 
 type RoundRobin struct {
-	data      []interface{}
-	next      int
+	data          []interface{}
+	next          int
 	needDeepEqual bool
 }
 
