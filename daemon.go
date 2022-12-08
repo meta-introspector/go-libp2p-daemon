@@ -63,20 +63,6 @@ type Daemon struct {
 	persistentConnMsgMaxSize int
 }
 
-func NewResourceManager() (network.ResourceManager) {
-    // setup resource usage limits; see https://github.com/libp2p/go-libp2p/tree/master/p2p/host/resource-manager
-//     scalingLimits := rcmgr.InfiniteLimits
-    //libp2p.SetDefaultServiceLimits(&scalingLimits)
-//     limits := scalingLimits.AutoScale()
-    limiter := rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits)
-    rm, err := rcmgr.NewResourceManager(limiter)
-    if err != nil {
-      panic(err)
-    }
-    return rm
-}
-
-
 func NewDaemon(
 	ctx context.Context,
 	maddr ma.Multiaddr,
@@ -90,6 +76,12 @@ func NewDaemon(
 		registeredUnaryProtocols: make(map[protocol.ID]*utils.RoundRobin),
 		persistentConnMsgMaxSize: persistentConnMsgMaxSize,
 	}
+    // setup resource usage limits; see https://github.com/libp2p/go-libp2p/tree/master/p2p/host/resource-manager
+    rm, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
+    if err != nil {
+        panic(err)
+    }
+    opts = append(opts, libp2p.ResourceManager(rm))
 
 	if dhtMode != "" {
 		var dhtOpts []dhtopts.Option
@@ -101,8 +93,7 @@ func NewDaemon(
 
 		opts = append(opts, libp2p.Routing(d.DHTRoutingFactory(dhtOpts)))
 	}
-    rm := NewResourceManager()
-    opts = append(opts, libp2p.ResourceManager(rm))
+
 	h, err := libp2p.New(opts...)
 	if err != nil {
 		return nil, err
