@@ -16,6 +16,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 
 	multierror "github.com/hashicorp/go-multierror"
 	logging "github.com/ipfs/go-log"
@@ -61,6 +63,20 @@ type Daemon struct {
 	persistentConnMsgMaxSize int
 }
 
+func NewResourceManager() (network.ResourceManager) {
+    // setup resource usage limits; see https://github.com/libp2p/go-libp2p/tree/master/p2p/host/resource-manager
+    scalingLimits := rcmgr.DefaultLimits
+    libp2p.SetDefaultServiceLimits(&scalingLimits)
+    limits := scalingLimits.AutoScale()
+    limiter := rcmgr.NewFixedLimiter(limits)
+    rm, err := rcmgr.NewResourceManager(limiter)
+    if err != nil {
+      panic(err)
+    }
+    return rm
+}
+
+
 func NewDaemon(
 	ctx context.Context,
 	maddr ma.Multiaddr,
@@ -85,7 +101,8 @@ func NewDaemon(
 
 		opts = append(opts, libp2p.Routing(d.DHTRoutingFactory(dhtOpts)))
 	}
-
+    rm := NewResourceManager()
+    opts = append(opts, libp2p.ResourceManager(rm))
 	h, err := libp2p.New(opts...)
 	if err != nil {
 		return nil, err
