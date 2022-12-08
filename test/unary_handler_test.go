@@ -44,7 +44,6 @@ func TestConcurrentCalls(t *testing.T) {
 		t.Fatal(err)
 	}
 
-    time.Sleep(time.Second / 10)
 	count := 100
 
 	var wg sync.WaitGroup
@@ -64,6 +63,7 @@ func TestConcurrentCalls(t *testing.T) {
 				panic(err)
 			}
 		}(i)
+		time.Sleep(time.Second / 10)
 	}
 
 	wg.Wait()
