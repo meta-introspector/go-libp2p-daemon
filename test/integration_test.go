@@ -84,6 +84,7 @@ func TestStreams(t *testing.T) {
 	err = c1.NewStreamHandler(testprotos, makeExpectStringHandler(t, done), false)
 	require.NoError(t, err)
 
+	time.Sleep(time.Second / 10)
 	err = callExpectStringHandler(c2, d1.ID(), testprotos, done)
 	require.NoError(t, err)
 }
@@ -113,6 +114,8 @@ func TestRemovingStreams(t *testing.T) {
 	require.NoError(t, err)
 	err = c2.NewStreamHandler(testprotos, makeExpectStringHandler(t, done), true)
 	require.NoError(t, err)
+
+	time.Sleep(time.Second / 10)
 	err = callExpectStringHandler(c3, peer1ID, testprotos, done)
 	require.NoError(t, err)
 
