@@ -316,7 +316,6 @@ func main() {
 
 	if c.AutoNat {
 		opts = append(opts, libp2p.EnableNATService())
-		opts = append(opts, libp2p.EnableHolePunching())
 		if c.Relay.Enabled {
 		    opts = append(opts, libp2p.EnableHolePunching())
 		}
