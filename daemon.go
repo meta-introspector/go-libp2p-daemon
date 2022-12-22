@@ -37,7 +37,7 @@ type Daemon struct {
 	dht    *dht.IpfsDHT
 	pubsub *ps.PubSub
 
-	peerSourceChan chan peer.AddrInfo  // potential relay peers go through this channel; nil means no relay disovery
+	peerSourceChan       chan peer.AddrInfo // potential relay peers go through this channel; nil means no relay disovery
 	cancelRelayDiscovery context.CancelFunc
 
 	mx sync.Mutex
@@ -114,7 +114,7 @@ func NewDaemon(
 	d.listener = l
 
 	if d.peerSourceChan != nil {
-	    d.cancelRelayDiscovery = BeginRelayDiscovery(d.host, d.dht, trustedRelays, d.peerSourceChan)
+		d.cancelRelayDiscovery = BeginRelayDiscovery(d.host, d.dht, trustedRelays, d.peerSourceChan)
 	}
 
 	go d.trapSignals()
@@ -234,13 +234,13 @@ func (d *Daemon) Close() error {
 		merr = multierror.Append(merr, err)
 	}
 
-    if d.cancelRelayDiscovery != nil {
-        d.cancelRelayDiscovery()
-        d.cancelRelayDiscovery = nil
-    }
+	if d.cancelRelayDiscovery != nil {
+		d.cancelRelayDiscovery()
+		d.cancelRelayDiscovery = nil
+	}
 	if d.peerSourceChan != nil {
-	    close(d.peerSourceChan)
-	    d.peerSourceChan = nil
+		close(d.peerSourceChan)
+		d.peerSourceChan = nil
 	}
 
 	return merr.ErrorOrNil()
