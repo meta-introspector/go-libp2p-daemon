@@ -333,6 +333,7 @@ func main() {
 		if c.Relay.Auto {
 			opts, peerChan = p2pd.ConfigureAutoRelay(opts, staticRelaysArray)
 			// note: daemon will detect that this is enabled and run autoRelayFeeder for this to work
+			defer close(peerChan) // TODO move to d.serve
 		}
 	}
 
