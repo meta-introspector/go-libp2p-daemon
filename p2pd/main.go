@@ -430,7 +430,7 @@ func main() {
 	    var peering = p2pd.Peering{}  // TODO construct this from bootstrap peers
 	    peering = peering;
 	    cancel := p2pd.BeginAutoRelayFeeder(d.Host, d.Dht, peering, peerChan)
-	    defer cancel()
+	    defer cancel() // TODO move cancel / close peerChan to func (d *Daemon) Close()
 	}
 	//TODO move inside serve
 
