@@ -82,7 +82,7 @@ func main() {
 	gossipsubHeartbeatInterval := flag.Duration("gossipsubHeartbeatInterval", 0, "Specifies the gossipsub heartbeat interval")
 	gossipsubHeartbeatInitialDelay := flag.Duration("gossipsubHeartbeatInitialDelay", 0, "Specifies the gossipsub initial heartbeat delay")
 	relayEnabled := flag.Bool("relay", true, "Enables circuit relay")
-	flag.Bool("relayActive", false, "Enables active mode for relay, see relayService")
+	flag.Bool("relayActive", false, "Enables active mode for relay (deprecated, see relayService)")
 	flag.Bool("relayHop", false, "Enables hop for relay (deprecated, has no effect)")
 	relayHopLimit := flag.Int("relayHopLimit", 0, "Sets the hop limit for hop relays (deprecated, has no effect)")
 	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
