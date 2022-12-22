@@ -328,6 +328,7 @@ func main() {
 
 		if !c.NoListen {
             opts = append(opts, libp2p.EnableRelayService())
+            // TODO add a special option, default = True, expose in hivemind
 		}
 
 		if c.Relay.Auto {
