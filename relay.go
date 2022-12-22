@@ -55,7 +55,7 @@ func BeginAutoRelayFeeder(h host.Host, dht *dht.IpfsDHT, cfgPeering Peering, pee
                 }
                 select {
                 case peerChan <- trustedPeer:
-                    fmt.Printf("I JUST WROTE TO CHANNEL TRUSTED PEER: %v\n", trustedPeer)
+                    //fmt.Printf("I JUST WROTE TO CHANNEL TRUSTED PEER: %v\n", trustedPeer)
                 case <-ctx.Done():
                     return
                 }
@@ -80,7 +80,7 @@ func BeginAutoRelayFeeder(h host.Host, dht *dht.IpfsDHT, cfgPeering Peering, pee
                 dhtPeer := peer.AddrInfo{ID: p, Addrs: addrs}
                 select {
                 case peerChan <- dhtPeer:
-                    fmt.Printf("I JUST WROTE TO CHANNEL DHT PEER: %v\n", dhtPeer)
+                    //fmt.Printf("I JUST WROTE TO CHANNEL DHT PEER: %v\n", dhtPeer)
                 case <-ctx.Done():
                     return
                 }
