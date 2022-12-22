@@ -423,14 +423,12 @@ func main() {
 	//TODO move inside serve
 	// how: feed peerChan into server; save as d.peerChan; in d.serve, beginAutoRelayFeeder and defer cancel
     if peerChan != nil {
-	    if c.DHT.Mode == "" {
-	       panic("Using autorelay but DHT is disabled, please enable DHT or set staticRelays")
-	    }
 	    fmt.Printf("Launching a background autoRelay feeder %v\n", d.Dht)
 	    var peering = p2pd.Peering{}  // TODO construct this from bootstrap peers
 	    peering = peering;
 	    cancel := p2pd.BeginAutoRelayFeeder(d.Host, d.Dht, peering, peerChan)
 	    defer cancel() // TODO move cancel / close peerChan to func (d *Daemon) Close()
+	    // TODO check without dht (nil)
 	}
 	//TODO move inside serve
 
