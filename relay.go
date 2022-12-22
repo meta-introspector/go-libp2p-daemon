@@ -2,7 +2,6 @@ package p2pd
 
 import (
 	"context"
-	"fmt"
 	"runtime/debug"
 	"time"
 
@@ -17,19 +16,65 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-type AddrInfoChan chan peer.AddrInfo
+func parseRelays(relay_strings []string) []peer.AddrInfo {
+    relay_addrs := make([]peer.AddrInfo, 0, len(relay_strings))
+    for _, s := range relay_strings {
+        var addr *peer.AddrInfo
+        var err error
+        addr, err = peer.AddrInfoFromString(s)
+        if err != nil {
+            panic(err)
+        }
+        relay_addrs = append(relay_addrs, *addr)
+    }
+    return relay_addrs
+}
 
-func BeginAutoRelayFeeder(h host.Host, dht *dht.IpfsDHT, cfgPeering Peering, peerChan chan<- peer.AddrInfo) context.CancelFunc {
+func MaybeConfigureAutoRelay(opts []libp2p.Option, relayDiscovery bool, trustedRelays []string) ([]libp2p.Option, chan peer.AddrInfo) {
+    var peerSourceChan chan peer.AddrInfo  // default(nil) means no peerSource
+
+    if !relayDiscovery && len(trustedRelays) > 0 {
+        log.Debugf("Running with static relays only: %v\n", trustedRelays)
+        // static relays, no automatic discovery
+        opts = append(opts, libp2p.EnableAutoRelay(
+            autorelay.WithStaticRelays(parseRelays(trustedRelays)),
+            autorelay.WithCircuitV1Support(),
+        ))
+	} else if relayDiscovery {
+    	peerSourceChan = make(chan peer.AddrInfo)
+    	// requires daemon to BeginRelayDiscovery once it is initialized
+        opts = append(opts, libp2p.EnableAutoRelay(
+            autorelay.WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+                r := make(chan peer.AddrInfo)
+                go func() {
+                    defer close(r)
+                    for ; numPeers != 0; numPeers-- {
+                        select {
+                        case v, ok := <-peerSourceChan:
+                            if !ok {
+                                return
+                            }
+                            select {
+                            case r <- v:
+                            case <-ctx.Done():
+                                return
+                            }
+                        case <-ctx.Done():
+                            return
+                        }
+                    }
+                }()
+                return r
+            }, 0)))
+	}
+	return opts, peerSourceChan
+}
+
+func BeginRelayDiscovery(h host.Host, dht *dht.IpfsDHT, trustedRelays []string, peerSourceChan chan<- peer.AddrInfo) context.CancelFunc {
+    log.Debug("Began looking for potential relays in background\n")
+    var trustedRelayAddrs = parseRelays(trustedRelays)
     ctx, cancel := context.WithCancel(context.Background())
     done := make(chan struct{})
-
-    defer func() {
-        if r := recover(); r != nil {
-            fmt.Println("Recovering from unexpected error in AutoRelayFeeder:", r)
-            debug.PrintStack()
-        }
-        //TODOYOZH DO WE REALLY NEED THIS?
-    }()
     go func() {
         defer close(done)
 
@@ -42,106 +87,59 @@ func BeginAutoRelayFeeder(h host.Host, dht *dht.IpfsDHT, cfgPeering Peering, pee
         t := backoff.NewTicker(bo)
         defer t.Stop()
         for {
+            func() { // gather peers once
+                defer func() {  // recover from errors
+                    if r := recover(); r != nil {
+                        log.Warnw("Recovering from unexpected error in AutoRelayFeeder,", "caught", r)
+                        debug.PrintStack()
+                    }
+                }()
+
+                // Always feed trusted IDs (Peering.Peers in the config)
+                for _, trustedPeer := range trustedRelayAddrs {
+                    if len(trustedPeer.Addrs) == 0 {
+                        continue
+                    }
+                    select {
+                    case peerSourceChan <- trustedPeer:
+                        log.Debugf("Trying trusted peer as relay: %v\n", trustedPeer)
+                    case <-ctx.Done():
+                        return
+                    }
+                }
+
+                // Additionally, feed closest peers discovered via DHT
+                if dht == nil {
+                    panic("Daemon asked to perform relay discovery but has not DHT. Please set -dht=1")
+                }
+
+                closestPeers, err := dht.GetClosestPeers(ctx, h.ID().String())
+                if err != nil {
+                    // no-op: usually 'failed to find any peer in table' during startup
+                    return
+                }
+                for _, p := range closestPeers {
+                    addrs := h.Peerstore().Addrs(p)
+                    if len(addrs) == 0 {
+                        continue
+                    }
+                    dhtPeer := peer.AddrInfo{ID: p, Addrs: addrs}
+                    select {
+                    case peerSourceChan <- dhtPeer:
+                        log.Debugf("Trying dht peer as relay: %v\n", dhtPeer)
+                    case <-ctx.Done():
+                        return
+                    }
+                }
+            }()
+
             select {
             case <-t.C:
             case <-ctx.Done():
                 return
-            }
-
-            // Always feed trusted IDs (Peering.Peers in the config)
-            for _, trustedPeer := range cfgPeering.Peers {
-                if len(trustedPeer.Addrs) == 0 {
-                    continue
-                }
-                select {
-                case peerChan <- trustedPeer:
-                    //fmt.Printf("I JUST WROTE TO CHANNEL TRUSTED PEER: %v\n", trustedPeer)
-                case <-ctx.Done():
-                    return
-                }
-            }
-
-            // Additionally, feed closest peers discovered via DHT
-            if dht == nil {
-                /* noop due to missing dht.WAN. happens in some unit tests,//TODO YOZH FIX COMMENTS
-                   not worth fixing as we will refactor this after go-libp2p 0.20 */
-                continue
-            }
-            closestPeers, err := dht.GetClosestPeers(ctx, h.ID().String())
-            if err != nil {
-                // no-op: usually 'failed to find any peer in table' during startup
-                continue
-            }
-            for _, p := range closestPeers {
-                addrs := h.Peerstore().Addrs(p)
-                if len(addrs) == 0 {
-                    continue
-                }
-                dhtPeer := peer.AddrInfo{ID: p, Addrs: addrs}
-                select {
-                case peerChan <- dhtPeer:
-                    //fmt.Printf("I JUST WROTE TO CHANNEL DHT PEER: %v\n", dhtPeer)
-                case <-ctx.Done():
-                    return
-                }
             }
         }
     }()
 
     return cancel
 }
-
-type Peering struct {
-	// Peers lists the nodes to attempt to stay connected with.
-	Peers []peer.AddrInfo
-}
-
-func ConfigureAutoRelay(opts []libp2p.Option, staticRelays []string) ([]libp2p.Option, chan peer.AddrInfo) {
-    // note: this requires that the daemon runs autoRelayFeeder in backround
-	if len(staticRelays) > 0 {
-        static := make([]peer.AddrInfo, 0, len(staticRelays))
-        for _, s := range staticRelays {
-            var addr *peer.AddrInfo
-            var err error
-            addr, err = peer.AddrInfoFromString(s)
-            if err != nil {
-                panic(err)
-            }
-            static = append(static, *addr)
-        }
-        opts = append(opts, libp2p.EnableAutoRelay(
-            autorelay.WithStaticRelays(static),
-            autorelay.WithCircuitV1Support(),
-        ))
-        return opts, nil  // return nil for peerChan because we do not need peer source
-	}
-
-	peerChan := make(chan peer.AddrInfo)
-
-    opts = append(opts, libp2p.EnableAutoRelay(
-        autorelay.WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
-				r := make(chan peer.AddrInfo)
-				go func() {
-					defer close(r)
-					for ; numPeers != 0; numPeers-- {
-						select {
-						case v, ok := <-peerChan:
-							if !ok {
-								return
-							}
-							select {
-							case r <- v:
-							case <-ctx.Done():
-								return
-							}
-						case <-ctx.Done():
-							return
-						}
-					}
-				}()
-				return r
-        }, 0)))
-	return opts, peerChan
-
-}
-
