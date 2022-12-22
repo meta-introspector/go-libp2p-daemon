@@ -180,7 +180,7 @@ func main() {
 	}
 
 	if *natPortMap {
-	    c.NatPortMap = true
+		c.NatPortMap = true
 	}
 
 	if *relayEnabled {
@@ -194,16 +194,16 @@ func main() {
 		c.Relay.Auto = true
 	}
 
-    var trustedRelays []string
-    if *trustedRelaysRaw != "" {
-        trustedRelays = strings.Split(*trustedRelaysRaw, ",")
-        if len(trustedRelays) > 0 && !*relayEnabled{
-            panic("Found staticRelays but relays are not enabled, expected -relayEnabled=1")
-        }
-        if len(trustedRelays) > 0 && !*autoRelay{
-            panic("Found staticRelays but autoRelay is not enabled, expected -autoRelay=1")
-        }
-    }
+	var trustedRelays []string
+	if *trustedRelaysRaw != "" {
+		trustedRelays = strings.Split(*trustedRelaysRaw, ",")
+		if len(trustedRelays) > 0 && !*relayEnabled {
+			panic("Found staticRelays but relays are not enabled, expected -relayEnabled=1")
+		}
+		if len(trustedRelays) > 0 && !*autoRelay {
+			panic("Found staticRelays but autoRelay is not enabled, expected -autoRelay=1")
+		}
+	}
 
 	if *noListen {
 		c.NoListen = true
@@ -319,7 +319,7 @@ func main() {
 	if c.AutoNat {
 		opts = append(opts, libp2p.EnableNATService())
 		if c.Relay.Enabled {
-		    opts = append(opts, libp2p.EnableHolePunching())
+			opts = append(opts, libp2p.EnableHolePunching())
 		}
 	}
 
@@ -327,7 +327,7 @@ func main() {
 		opts = append(opts, libp2p.EnableRelay())
 
 		if *relayService {
-            opts = append(opts, libp2p.EnableRelayService())
+			opts = append(opts, libp2p.EnableRelayService())
 		}
 	}
 
@@ -358,9 +358,9 @@ func main() {
 
 	// start daemon
 	d, err := p2pd.NewDaemon(
-	     context.Background(), &c.ListenAddr, c.DHT.Mode,
-	     *relayDiscovery, trustedRelays, *persistentConnMaxMsgSize,
-	     opts...)
+		context.Background(), &c.ListenAddr, c.DHT.Mode,
+		*relayDiscovery, trustedRelays, *persistentConnMaxMsgSize,
+		opts...)
 	if err != nil {
 		log.Fatal(err)
 	}
