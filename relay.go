@@ -99,22 +99,20 @@ type Peering struct {
 func ConfigureAutoRelay(opts []libp2p.Option, staticRelays []string) ([]libp2p.Option, chan peer.AddrInfo) {
     // note: this requires that the daemon runs autoRelayFeeder in backround
 	if len(staticRelays) > 0 {
-        if len(staticRelays) > 0 {
-            static := make([]peer.AddrInfo, 0, len(staticRelays))
-            for _, s := range staticRelays {
-                var addr *peer.AddrInfo
-                var err error
-                addr, err = peer.AddrInfoFromString(s)
-                if err != nil {
-                    panic(err)
-                }
-                static = append(static, *addr)
+        static := make([]peer.AddrInfo, 0, len(staticRelays))
+        for _, s := range staticRelays {
+            var addr *peer.AddrInfo
+            var err error
+            addr, err = peer.AddrInfoFromString(s)
+            if err != nil {
+                panic(err)
             }
-            opts = append(opts, libp2p.EnableAutoRelay(
-                autorelay.WithStaticRelays(static),
-                autorelay.WithCircuitV1Support(),
-            ))
+            static = append(static, *addr)
         }
+        opts = append(opts, libp2p.EnableAutoRelay(
+            autorelay.WithStaticRelays(static),
+            autorelay.WithCircuitV1Support(),
+        ))
         return opts, nil  // return nil for peerChan because we do not need peer source
 	}
 
