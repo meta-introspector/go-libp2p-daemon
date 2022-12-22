@@ -190,7 +190,7 @@ func main() {
 		}
 	}
 
-    var relayDiscovery bool;
+	var relayDiscovery bool
 	if *autoRelay {
 		c.Relay.Auto = true
 		relayDiscovery = *relayDiscoveryAllowed
@@ -208,7 +208,7 @@ func main() {
 	}
 
 	if *autoRelay && !relayDiscovery && len(trustedRelays) == 0 {
-	    panic("Daemon with autoRelay requires either -relayDiscovery=1 or -trustedRelays=$STATIC_RELAYS_HERE")
+		panic("Daemon with autoRelay requires either -relayDiscovery=1 or -trustedRelays=$STATIC_RELAYS_HERE")
 	}
 
 	if *noListen {
