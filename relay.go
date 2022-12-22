@@ -41,6 +41,7 @@ func MaybeConfigureAutoRelay(opts []libp2p.Option, relayDiscovery bool, trustedR
             autorelay.WithCircuitV1Support(),
         ))
 	} else if relayDiscovery {
+	    log.Debug("Running with automatic relay discovery\n")
     	peerSourceChan = make(chan peer.AddrInfo)
     	// requires daemon to BeginRelayDiscovery once it is initialized
         opts = append(opts, libp2p.EnableAutoRelay(
@@ -66,6 +67,8 @@ func MaybeConfigureAutoRelay(opts []libp2p.Option, relayDiscovery bool, trustedR
                 }()
                 return r
             }, 0)))
+	} else {
+	    log.Debug("Running without autorelay\n")
 	}
 	return opts, peerSourceChan
 }

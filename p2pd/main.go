@@ -87,7 +87,7 @@ func main() {
 	relayHopLimit := flag.Int("relayHopLimit", 0, "Sets the hop limit for hop relays (deprecated, has no effect)")
 	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
 	autoRelay := flag.Bool("autoRelay", false, "Enables autorelay")
-	relayDiscovery := flag.Bool("relayDiscovery", true, "Discover potential relays in background if -autoRelay=1")
+	relayDiscoveryAllowed := flag.Bool("relayDiscovery", true, "Discover potential relays in background if -autoRelay=1")
 	trustedRelaysRaw := flag.String("trustedRelays", "", "comma separated list of multiaddrs for static circuit relay peers; be default, use bootstrap peers as trusted relays")
 	autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
 	hostAddrs := flag.String("hostAddrs", "", "comma separated list of multiaddrs the host should listen on")
@@ -190,8 +190,10 @@ func main() {
 		}
 	}
 
+    var relayDiscovery bool;
 	if *autoRelay {
 		c.Relay.Auto = true
+		relayDiscovery = *relayDiscoveryAllowed
 	}
 
 	var trustedRelays []string
@@ -203,6 +205,10 @@ func main() {
 		if len(trustedRelays) > 0 && !*autoRelay {
 			panic("Found staticRelays but autoRelay is not enabled, expected -autoRelay=1")
 		}
+	}
+
+	if *autoRelay && !relayDiscovery && len(trustedRelays) == 0 {
+	    panic("Daemon with autoRelay requires either -relayDiscovery=1 or -trustedRelays=$STATIC_RELAYS_HERE")
 	}
 
 	if *noListen {
@@ -359,7 +365,7 @@ func main() {
 	// start daemon
 	d, err := p2pd.NewDaemon(
 		context.Background(), &c.ListenAddr, c.DHT.Mode,
-		*relayDiscovery, trustedRelays, *persistentConnMaxMsgSize,
+		relayDiscovery, trustedRelays, *persistentConnMaxMsgSize,
 		opts...)
 	if err != nil {
 		log.Fatal(err)
