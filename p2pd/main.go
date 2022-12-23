@@ -91,7 +91,7 @@ func main() {
 	trustedRelaysRaw := flag.String("trustedRelays", "", "comma separated list of multiaddrs for static circuit relay peers; by default, use bootstrap peers as trusted relays")
 	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
 	relayMaxCircuits := flag.Int("relayMaxCircuits", 16, "maximum number of open relay connections for each peer if -relayService=1")
-	relayMaxReservations := flag.Int("relayMaxReservations", 256, "maximum number of reserved relay slots for each peer if -relayService=1")
+	relayMaxReservations := flag.Int("relayMaxReservations", 128, "maximum number of reserved relay slots for each peer if -relayService=1")
 	relayBufferSize := flag.Int("relayBufferSize", 1 << 24, "Sets the hop limit for hop relays (deprecated, has no effect)")
 	relayDataLimit := flag.Int("relayDataLimit", 1 << 32, "maximum data bytes relayed (in each direction) before resetting connection if -relayService=1")
 	relayTimeLimit := flag.Duration("relayTimeLimit", 30 * time.Minute, "maximum duration of a single active relayed connection if -relayService=1")
@@ -338,7 +338,7 @@ func main() {
 		opts = append(opts, libp2p.EnableRelay())
 
 		if *relayService {
-			opts = p2pd.ConfigureRelayService(opts)
+			opts = p2pd.ConfigureRelayService(opts, *relayMaxCircuits, *relayMaxReservations, *relayBufferSize, *relayDataLimit, *relayTimeLimit)
 		}
 	}
 

@@ -4,7 +4,6 @@ package p2pd
 
 import (
 	"context"
-	"fmt"
 	"runtime/debug"
 	"time"
 
@@ -150,8 +149,7 @@ func BeginRelayDiscovery(h host.Host, dht *dht.IpfsDHT, trustedRelays []string, 
 	return cancel
 }
 
-func ConfigureRelayService(opts []libp2p.Option, maxCircuits: int, maxReservations: int, relayBufferSize: int,
-                           timeLimit: time.Duration, dataLimit: int) []libp2p.Option {
+func ConfigureRelayService(opts []libp2p.Option, maxCircuits int, maxReservations int, relayBufferSize int, timeLimit time.Duration, dataLimit int64) []libp2p.Option {
     resources := relay.DefaultResources()
     resources.Limit = &relay.RelayLimit{Duration: timeLimit, Data: dataLimit}
     resources.MaxCircuits = maxCircuits
@@ -161,7 +159,7 @@ func ConfigureRelayService(opts []libp2p.Option, maxCircuits: int, maxReservatio
     resources.MaxReservationsPerASN = maxReservations
     resources.BufferSize = relayBufferSize
     opts = append(opts, libp2p.EnableRelayService(
-        relay.WithResources(resources)
+        relay.WithResources(resources),
     ))
     return opts
 }
