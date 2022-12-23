@@ -92,11 +92,11 @@ func main() {
 	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
 	relayMaxCircuits := flag.Int("relayMaxCircuits", 16, "maximum number of open relay connections for each peer if -relayService=1")
 	relayMaxReservations := flag.Int("relayMaxReservations", 128, "maximum number of reserved relay slots for each peer if -relayService=1")
-	relayBufferSize := flag.Int("relayBufferSize", 1 << 24, "size (in bytes) of the relayed connection buffers if -relayService=1")
-	relayDataLimit := flag.Int64("relayDataLimit", 1 << 32, "maximum data bytes relayed (in each direction) before resetting connection if -relayService=1")
-	relayTimeLimit := flag.Duration("relayTimeLimit", 30 * time.Minute, "maximum duration of a single active relayed connection if -relayService=1")
+	relayBufferSize := flag.Int("relayBufferSize", 1<<24, "size (in bytes) of the relayed connection buffers if -relayService=1")
+	relayDataLimit := flag.Int64("relayDataLimit", 1<<32, "maximum data bytes relayed (in each direction) before resetting connection if -relayService=1")
+	relayTimeLimit := flag.Duration("relayTimeLimit", 30*time.Minute, "maximum duration of a single active relayed connection if -relayService=1")
 
-    autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
+	autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
 	hostAddrs := flag.String("hostAddrs", "", "comma separated list of multiaddrs the host should listen on")
 	announceAddrs := flag.String("announceAddrs", "", "comma separated list of multiaddrs the host should announce to the network")
 	noListen := flag.Bool("noListenAddrs", false, "sets the host to listen on no addresses")
@@ -329,7 +329,7 @@ func main() {
 
 	if c.AutoNat {
 		opts = append(opts, libp2p.EnableNATService())
-        opts = append(opts, libp2p.EnableHolePunching())
+		opts = append(opts, libp2p.EnableHolePunching())
 	}
 
 	if c.Relay.Enabled {
