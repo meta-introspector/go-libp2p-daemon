@@ -149,7 +149,7 @@ func BeginRelayDiscovery(h host.Host, dht *dht.IpfsDHT, trustedRelays []string, 
 	return cancel
 }
 
-func ConfigureRelayService(opts []libp2p.Option, maxCircuits int, maxReservations int, relayBufferSize int, timeLimit time.Duration, dataLimit int64) []libp2p.Option {
+func ConfigureRelayService(opts []libp2p.Option, maxCircuits int, maxReservations int, relayBufferSize int, dataLimit int64, timeLimit time.Duration) []libp2p.Option {
     resources := relay.DefaultResources()
     resources.Limit = &relay.RelayLimit{Duration: timeLimit, Data: dataLimit}
     resources.MaxCircuits = maxCircuits
