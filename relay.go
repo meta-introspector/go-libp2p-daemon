@@ -150,16 +150,16 @@ func BeginRelayDiscovery(h host.Host, dht *dht.IpfsDHT, trustedRelays []string, 
 }
 
 func ConfigureRelayService(opts []libp2p.Option, maxCircuits int, maxReservations int, relayBufferSize int, dataLimit int64, timeLimit time.Duration) []libp2p.Option {
-    resources := relay.DefaultResources()
-    resources.Limit = &relay.RelayLimit{Duration: timeLimit, Data: dataLimit}
-    resources.MaxCircuits = maxCircuits
-    resources.MaxReservations = maxReservations
-    resources.MaxReservationsPerPeer = maxReservations
-    resources.MaxReservationsPerIP = maxReservations
-    resources.MaxReservationsPerASN = maxReservations
-    resources.BufferSize = relayBufferSize
-    opts = append(opts, libp2p.EnableRelayService(
-        relay.WithResources(resources),
-    ))
-    return opts
+	resources := relay.DefaultResources()
+	resources.Limit = &relay.RelayLimit{Duration: timeLimit, Data: dataLimit}
+	resources.MaxCircuits = maxCircuits
+	resources.MaxReservations = maxReservations
+	resources.MaxReservationsPerPeer = maxReservations
+	resources.MaxReservationsPerIP = maxReservations
+	resources.MaxReservationsPerASN = maxReservations
+	resources.BufferSize = relayBufferSize
+	opts = append(opts, libp2p.EnableRelayService(
+		relay.WithResources(resources),
+	))
+	return opts
 }
