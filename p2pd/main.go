@@ -81,15 +81,22 @@ func main() {
 	pubsubSignStrict := flag.Bool("pubsubSignStrict", true, "Enables or disables pubsub strict signature verification")
 	gossipsubHeartbeatInterval := flag.Duration("gossipsubHeartbeatInterval", 0, "Specifies the gossipsub heartbeat interval")
 	gossipsubHeartbeatInitialDelay := flag.Duration("gossipsubHeartbeatInitialDelay", 0, "Specifies the gossipsub initial heartbeat delay")
+
 	relayEnabled := flag.Bool("relay", true, "Enables circuit relay")
 	flag.Bool("relayActive", false, "Enables active mode for relay (deprecated, has no effect, use -relayService=1 instead)")
 	flag.Bool("relayHop", false, "Enables hop for relay (deprecated, has no effect)")
 	relayHopLimit := flag.Int("relayHopLimit", 0, "Sets the hop limit for hop relays (deprecated, has no effect)")
-	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
 	autoRelay := flag.Bool("autoRelay", false, "Enables autorelay")
 	relayDiscovery := flag.Bool("relayDiscovery", true, "Discover potential relays in background if -autoRelay=1")
 	trustedRelaysRaw := flag.String("trustedRelays", "", "comma separated list of multiaddrs for static circuit relay peers; by default, use bootstrap peers as trusted relays")
-	autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
+	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
+	relayMaxCircuits := flag.Int("relayMaxCircuits", 16, "maximum number of open relay connections for each peer if -relayService=1")
+	relayMaxReservations := flag.Int("relayMaxReservations", 256, "maximum number of reserved relay slots for each peer if -relayService=1")
+	relayBufferSize := flag.Int("relayBufferSize", 1 << 24, "Sets the hop limit for hop relays (deprecated, has no effect)")
+	relayDataLimit := flag.Int("relayDataLimit", 1 << 32, "maximum data bytes relayed (in each direction) before resetting connection if -relayService=1")
+	relayTimeLimit := flag.Duration("relayTimeLimit", 30 * time.Minute, "maximum duration of a single active relayed connection if -relayService=1")
+
+    autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
 	hostAddrs := flag.String("hostAddrs", "", "comma separated list of multiaddrs the host should listen on")
 	announceAddrs := flag.String("announceAddrs", "", "comma separated list of multiaddrs the host should announce to the network")
 	noListen := flag.Bool("noListenAddrs", false, "sets the host to listen on no addresses")
@@ -331,7 +338,7 @@ func main() {
 		opts = append(opts, libp2p.EnableRelay())
 
 		if *relayService {
-			opts = append(opts, libp2p.EnableRelayService())
+			opts = p2pd.ConfigureRelayService(opts)
 		}
 	}
 
