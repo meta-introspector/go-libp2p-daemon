@@ -88,7 +88,7 @@ func main() {
 	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
 	autoRelay := flag.Bool("autoRelay", false, "Enables autorelay")
 	relayDiscoveryAllowed := flag.Bool("relayDiscovery", true, "Discover potential relays in background if -autoRelay=1")
-	trustedRelaysRaw := flag.String("trustedRelays", "", "comma separated list of multiaddrs for static circuit relay peers; be default, use bootstrap peers as trusted relays")
+	trustedRelaysRaw := flag.String("trustedRelays", "", "comma separated list of multiaddrs for static circuit relay peers; by default, use bootstrap peers as trusted relays")
 	autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
 	hostAddrs := flag.String("hostAddrs", "", "comma separated list of multiaddrs the host should listen on")
 	announceAddrs := flag.String("announceAddrs", "", "comma separated list of multiaddrs the host should announce to the network")
