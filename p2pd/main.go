@@ -82,12 +82,12 @@ func main() {
 	gossipsubHeartbeatInterval := flag.Duration("gossipsubHeartbeatInterval", 0, "Specifies the gossipsub heartbeat interval")
 	gossipsubHeartbeatInitialDelay := flag.Duration("gossipsubHeartbeatInitialDelay", 0, "Specifies the gossipsub initial heartbeat delay")
 	relayEnabled := flag.Bool("relay", true, "Enables circuit relay")
-	flag.Bool("relayActive", false, "Enables active mode for relay (deprecated, see relayService)")
+	flag.Bool("relayActive", false, "Enables active mode for relay (deprecated, has no effect, use -relayService=1 instead)")
 	flag.Bool("relayHop", false, "Enables hop for relay (deprecated, has no effect)")
 	relayHopLimit := flag.Int("relayHopLimit", 0, "Sets the hop limit for hop relays (deprecated, has no effect)")
 	relayService := flag.Bool("relayService", true, "Configures this node to serve as a relay for others if -relayEnabled=1")
 	autoRelay := flag.Bool("autoRelay", false, "Enables autorelay")
-	relayDiscoveryAllowed := flag.Bool("relayDiscovery", true, "Discover potential relays in background if -autoRelay=1")
+	relayDiscovery := flag.Bool("relayDiscovery", true, "Discover potential relays in background if -autoRelay=1")
 	trustedRelaysRaw := flag.String("trustedRelays", "", "comma separated list of multiaddrs for static circuit relay peers; by default, use bootstrap peers as trusted relays")
 	autonat := flag.Bool("autonat", false, "Enables the AutoNAT service")
 	hostAddrs := flag.String("hostAddrs", "", "comma separated list of multiaddrs the host should listen on")
@@ -190,10 +190,8 @@ func main() {
 		}
 	}
 
-	var relayDiscovery bool
 	if *autoRelay {
 		c.Relay.Auto = true
-		relayDiscovery = *relayDiscoveryAllowed
 	}
 
 	var trustedRelays []string
@@ -207,7 +205,7 @@ func main() {
 		}
 	}
 
-	if *autoRelay && !relayDiscovery && len(trustedRelays) == 0 {
+	if *autoRelay && !*relayDiscovery && len(trustedRelays) == 0 {
 		panic("Daemon with autoRelay requires either -relayDiscovery=1 or -trustedRelays=$STATIC_RELAYS_HERE")
 	}
 
@@ -365,7 +363,7 @@ func main() {
 	// start daemon
 	d, err := p2pd.NewDaemon(
 		context.Background(), &c.ListenAddr, c.DHT.Mode,
-		relayDiscovery, trustedRelays, *persistentConnMaxMsgSize,
+		*relayDiscovery, trustedRelays, *persistentConnMaxMsgSize,
 		opts...)
 	if err != nil {
 		log.Fatal(err)

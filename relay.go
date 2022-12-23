@@ -1,5 +1,7 @@
 package p2pd
 
+// This file is based on https://github.com/ipfs/kubo/blob/master/core/node/libp2p/relay.go
+
 import (
 	"context"
 	"runtime/debug"
@@ -15,18 +17,18 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-func parseRelays(relay_strings []string) []peer.AddrInfo {
-	relay_addrs := make([]peer.AddrInfo, 0, len(relay_strings))
-	for _, s := range relay_strings {
+func parseRelays(addrStrings []string) []peer.AddrInfo {
+	addrs := make([]peer.AddrInfo, 0, len(addrStrings))
+	for _, s := range addrStrings {
 		var addr *peer.AddrInfo
 		var err error
 		addr, err = peer.AddrInfoFromString(s)
 		if err != nil {
 			panic(err)
 		}
-		relay_addrs = append(relay_addrs, *addr)
+		addrs = append(addrs, *addr)
 	}
-	return relay_addrs
+	return addrs
 }
 
 func MaybeConfigureAutoRelay(opts []libp2p.Option, relayDiscovery bool, trustedRelays []string) ([]libp2p.Option, chan peer.AddrInfo) {
