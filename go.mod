@@ -15,7 +15,6 @@ require (
 	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.8.1
 )
 
