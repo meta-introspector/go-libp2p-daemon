@@ -65,6 +65,7 @@ type PubSub struct {
 type Relay struct {
 	Enabled  bool
 	Auto     bool
+	Discovery bool
 	HopLimit int
 }
 
@@ -166,6 +167,7 @@ func NewDefaultConfig() Config {
 		Relay: Relay{
 			Enabled:  true,
 			Auto:     false,
+			Discovery:  false,
 			HopLimit: 0,
 		},
 		AutoNat:           false,
