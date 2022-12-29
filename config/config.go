@@ -63,10 +63,10 @@ type PubSub struct {
 }
 
 type Relay struct {
-	Enabled  bool
-	Auto     bool
+	Enabled   bool
+	Auto      bool
 	Discovery bool
-	HopLimit int
+	HopLimit  int
 }
 
 type DHT struct {
@@ -165,10 +165,10 @@ func NewDefaultConfig() Config {
 			},
 		},
 		Relay: Relay{
-			Enabled:  true,
-			Auto:     false,
-			Discovery:  false,
-			HopLimit: 0,
+			Enabled:   true,
+			Auto:      false,
+			Discovery: false,
+			HopLimit:  0,
 		},
 		AutoNat:           false,
 		HostAddresses:     make(MaddrArray, 0),
