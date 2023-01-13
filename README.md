@@ -16,7 +16,7 @@
 
 The [learning-at-home](https://github.com/learning-at-home) team maintains this fork because the upstream repository ([libp2p/go-libp2p-daemon](https://github.com/libp2p/go-libp2p-daemon)) is not maintained by its original developers anymore.
 
-This fork is used for all networking in [Hivemind](https://github.com/learning-at-home/hivemind) and [Petals](https://github.com/bigscience-workshop/petals) projects.
+This fork is used for all networking in [Hivemind](https://github.com/learning-at-home/hivemind) and [Petals](https://github.com/bigscience-workshop/petals) projects. This allows us to have protocol-agnostic networking with NAT traversal & libp2p relay features.
 
 ## Install
 
