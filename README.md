@@ -14,9 +14,9 @@
 
 ## Maintainance
 
-We maintain this fork because the upstream of this project ([libp2p/go-libp2p-daemon](https://github.com/libp2p/go-libp2p-daemon)) is not maintained by its original developers anymore.
+The [learning-at-home](https://github.com/learning-at-home) team maintains this fork because the upstream repository ([libp2p/go-libp2p-daemon](https://github.com/libp2p/go-libp2p-daemon)) is not maintained by its original developers anymore.
 
-This fork is used for all networking in [hivemind](https://github.com/learning-at-home/hivemind) and [Petals](https://github.com/bigscience-workshop/petals) projects.
+This fork is used for all networking in [Hivemind](https://github.com/learning-at-home/hivemind) and [Petals](https://github.com/bigscience-workshop/petals) projects.
 
 ## Install
 
