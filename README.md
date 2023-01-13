@@ -12,14 +12,11 @@
   nor whether a native libp2p implementation exists in that language.
 
 
-## 🚧 This project is not actively maintained and is unsupported! 🚧
+## Maintainance
 
-It has reached viable PoC stage but is not being actively worked on or maintained. If you want to play around with libp2p, go ahead and try this project out. However:
+We maintain this fork because the upstream of this project ([libp2p/go-libp2p-daemon](https://github.com/libp2p/go-libp2p-daemon)) is not maintained by its original developers anymore.
 
-* There is little documentation and no support.
-* The libp2p version used in this project will not be actively updated.
-
-In other words: **DO NOT USE IN PRODUCTION**
+This fork is used for all networking in [hivemind](https://github.com/learning-at-home/hivemind) and [Petals](https://github.com/bigscience-workshop/petals) projects.
 
 ## Install
 
